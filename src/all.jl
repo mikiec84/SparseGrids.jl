@@ -174,14 +174,14 @@ function interp(x1::Array{Float64},G::Grid,A::Array{Float64,1})
 	dA = zeros(G.n)
 	w = zeros(G.n)
 
-    ccall((libwget, "libsparse.so"),
+    ccall((libwget, libsparse),
 		Void,
 		(Ptr{Float64},Int32,Int32,Ptr{Int64},Ptr{Int32},Ptr{Float64},Int32,Ptr{Float64},Ptr{Float64},Ptr{Float64}),
 		pointer(G.grid),G.n,G.d,pointer(G.lvl_s),pointer(G.lvl_l),pointer(A),G.q,pointer(Aold),pointer(dA),pointer(w))
 
 	xold = zeros(nx)
 	dx = zeros(nx)
-	ccall((libinterp, "libsparse.so"),
+	ccall((libinterp, libsparse),
 		Void,
 		(Ptr{Float64},Int32,Ptr{Float64},Int32,Int32,
 		Ptr{Float64},Ptr{Float64},Ptr{Float64},Int32,Ptr{Float64},
@@ -197,7 +197,7 @@ function getW(G::Grid,A)
 	Aold = zeros(G.n)
 	dA = zeros(G.n)
 	w = zeros(G.n)
-	ccall((libwget, "libsparse.so"),
+	ccall((libwget, libsparse),
 		Void,
 		(Ptr{Float64},Int32,Int32,Ptr{Float64},Ptr{Float64},Ptr{Float64},Int32,Ptr{Float64},Ptr{Float64},Ptr{Float64}),
 		pointer(G.grid),G.n,G.d,pointer(G.lvl_s),pointer(G.lvl_l),pointer(A),G.q,pointer(Aold),pointer(dA),pointer(w))
@@ -264,7 +264,7 @@ function getWinvC(G::Grid)
 	w = zeros(G.n,G.n)
 	A = eye(G.n,G.n)
 	grid = deepcopy(G.grid)
-	ccall((libwgetinv, "libsparse.so"),
+	ccall((libwgetinv, libsparse),
 		Void,
 		(Ptr{Float64},Int32,Int32,Ptr{Float64},Ptr{Float64},Ptr{Float64},Int32,Ptr{Float64},Ptr{Float64},Ptr{Float64}),
 		pointer(grid),G.n,G.d,pointer(G.lvl_s),pointer(G.lvl_l),pointer(A),G.q,pointer(Aold),pointer(dA),pointer(w))
