@@ -1,5 +1,6 @@
 include("combinatorics.jl")
 include("conversion.jl")
+const libsparse = @windows ? "libsparse" : "libsparse.so"
 
 immutable Index
 	x::Vector{Int}
@@ -45,7 +46,7 @@ function Nodes(I::Index)
     for i in eachindex(out)
     	@inbounds out[i] = Node(zeros(dim),sum(I.x)-dim,I)
     end
-    
+
     s = 1
     for d=1:dim
         snext = s*sz[d]
@@ -81,7 +82,7 @@ function nodes(Q::Index)
 	q = maximum(Q)+length(Q)
 	nG = grid_size(Q)
 	GRID = Array(Node,nG)
-	
+
 	next_ind = 0
 	for q1 = D:q
 		inds = comb(D,q1)
@@ -106,9 +107,9 @@ function nodes(Q::Index,q::Int)
 	q = q+length(Q)
 	nG = grid_size(Q)
 	GRID = Array(Node,0)
-	
+
 	next_ind = 0
-	
+
 	inds = comb(D,q)
 	bQ = Array(Bool,length(inds))
 	for i = 1:length(inds)
@@ -123,7 +124,7 @@ function nodes(Q::Index,q::Int)
 		GRID = [GRID;Nodes(tseq)]
 		next_ind += new_grid_size
 	end
-	
+
 	return GRID[1:next_ind]
 end
 
@@ -165,7 +166,7 @@ Base.values(G::Grid)= nUtoX(G.grid,G.bounds)
 Base.values(G::Grid,i::Int)= UtoX(G.grid[:,i],G.bounds[:,i])
 
 function interp(x1::Array{Float64},G::Grid,A::Array{Float64,1})
-	x = nXtoU(x1,G.bounds)	
+	x = nXtoU(x1,G.bounds)
 	x=clamp(x,0.0,1.0)
 	nx = size(x,1)
 
@@ -275,9 +276,9 @@ function getQ(xi1::Array{Float64},G::Grid)
     xi[xi.>1]=1.0
     xi[xi.<0]=0.0
     nx = size(xi,1)
-    
+
     lvl_l = [1;G.lvl_l]
-    
+
     Q = spzeros(nx,G.n)
     drange=collect(1:G.d)
     for i in 1:nx
@@ -286,10 +287,10 @@ function getQ(xi1::Array{Float64},G::Grid)
                 temp2=1.0
                 for d in drange
                     @inbounds temp2 *= basis_func(xi[i,d],G.grid[ii,d],G.lvl_s[ii,d])
-                    
+
                 end
                 Q[i,ii]+=temp2
-            end 
+            end
         end
     end
    return Q
@@ -311,10 +312,10 @@ function grow!(G::Grid,id::Int,bounds::Vector{Int})
     G.active[id]=false
     targ = G.grid[id,:]
 
-    
+
     newX = nodes(Index(min(ones(Int,G.d)*(G.level[id]+1),bounds)),G.level[id]+1)
-    
-   
+
+
     if length(newX)==0
     	return
     end
@@ -328,7 +329,7 @@ function grow!(G::Grid,id::Int,bounds::Vector{Int})
 
     dst = Float64[norm(newX[i].x-vec(targ)) for i = 1:length(newX)]
     newX = newX[sortperm(dst)[1:n],:]
-    
+
     id1 = ones(Bool,size(newX,1))
     for i = 1:size(newX,1)
         for j = 1:G.n
@@ -341,7 +342,7 @@ function grow!(G::Grid,id::Int,bounds::Vector{Int})
     	return
     end
     newX = newX[id1]
-    
+
 
     G.grid = [G.grid;hcat(Array{Float64}[x.x for x in newX]...)']
     G.index = [G.index;hcat(Array{Int}[x.index.x for x in newX]...)']
@@ -357,7 +358,7 @@ function grow!(G::Grid,id::Int,bounds::Vector{Int})
 	G.q = maximum(G.level)
     G.lvl_l=[[findfirst(G.level.==i) for i = 1:maximum(G.level)];G.n+1]
     G.lvl_s = convert(Array{Float64},map(Mi,G.index))
-    
+
     return nothing
 end
 

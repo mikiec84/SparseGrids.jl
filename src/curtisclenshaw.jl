@@ -1,7 +1,14 @@
 module CurtisClenshaw
+@windows ? (begin
+const libwget 	= :w_get_l
+const libwgetinv= :w_get_inv_l
+const libinterp = :sparse_interp_l
+end
+:begin
 const libwget 	= :_Z7w_get_lPdiiPiS0_S_iS_S_S_
 const libwgetinv=:_Z11w_get_inv_lPdiiPiS0_S_iS_S_S_
 const libinterp = :_Z15sparse_interp_lPdiS_iiPiS0_S_iS_S_S_
+end)
 
 Mi(i::Int) = (i==1) ? 1 : 2^(i-1)+1
 
@@ -84,6 +91,3 @@ include("all.jl")
 
 
 end
-
-
-

@@ -1,7 +1,14 @@
 module NoBoundary
+@windows ? (begin
+const libwget 	= :w_get_nb
+const libwgetinv= :w_get_inv_nb
+const libinterp = :sparse_interp_nb
+end
+:begin
 const libwget 	= :_Z8w_get_nbPdiiPiS0_S_iS_S_S_
 const libwgetinv= :_Z12w_get_inv_nbPdiiPiS0_S_iS_S_S_
 const libinterp = :_Z16sparse_interp_nbPdiS_iiPiS0_S_iS_S_S_
+end)
 
 Mi(i::Int) = 2^i-1
 dMi(i::Int) = Mi(i)-Mi(i-1)
@@ -36,7 +43,7 @@ function basis_func(x::Float64, xij::Float64, mi)
         return 1.0
     else
         if xij==nbfirstXi(mi)
-        
+
             if (x<2./(mi+1.0))
                 return 2.-(mi+1.)*x;
             else
@@ -44,7 +51,7 @@ function basis_func(x::Float64, xij::Float64, mi)
             end
         end
         if xij==nblastXi(mi)
-        
+
             if (x>(mi-1.)/(mi+1.))
                 return (mi+1.)*x -mi + 1.0
             else

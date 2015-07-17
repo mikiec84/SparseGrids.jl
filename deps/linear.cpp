@@ -2,8 +2,8 @@ inline double linear_bf (double x, double xij, int mi)
 {
     if (mi==1)
         return 1;
-    else if (abs(x-xij)<(1./(mi-1)))
-        return (1-((mi)-1)*abs(x-xij));
+    else if (fabs(x-xij)<(1./(mi-1)))
+        return (1-((mi)-1)*fabs(x-xij));
     else return 0;
 }
 
@@ -77,9 +77,9 @@ void w_get_inv_l(double *grid, int nG, int D, int *lvl_s, int *lvl_l, double *A,
             {
                 for (j=0;j<nG;j++)
                 {
-                    w[i+nG*j] = A[i+nG*j] - Aold[i+nG*j];    
+                    w[i+nG*j] = A[i+nG*j] - Aold[i+nG*j];
                 }
-                
+
             }
         }
         else
@@ -88,7 +88,7 @@ void w_get_inv_l(double *grid, int nG, int D, int *lvl_s, int *lvl_l, double *A,
             {
                 for (j=0;j<nG;j++)
                 {
-                    w[i+nG*j] = A[i+nG*j] - Aold[i+nG*j];    
+                    w[i+nG*j] = A[i+nG*j] - Aold[i+nG*j];
                 }
             }
         }
@@ -195,7 +195,7 @@ void q_get_l(double * xi, int nx, double * grid, int nG, int D, int * lvl_s, int
                     temp2 =1;
                     for (d=0;d<D;d++)
                         temp2 *= linear_bf( xi[i+d*nx] , grid[ii+d*nG] , lvl_s[ii+d*nG] );
-                    
+
                     X[i+ii*nx] += temp2;
                 }
             }

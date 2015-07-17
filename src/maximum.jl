@@ -1,7 +1,14 @@
 module Maximum
+@windows ? (begin
+const libwget 	 = :w_get_max
+const libwgetinv = :w_get_inv_max
+const libinterp  = :sparse_interp_max
+end
+:begin
 const libwget 	= :_Z9w_get_maxPdiiPiS0_S_iS_S_S_
 const libwgetinv = :_Z13w_get_inv_maxPdiiPiS0_S_iS_S_S_
 const libinterp = :_Z17sparse_interp_maxPdiS_iiPiS0_S_iS_S_S_
+end)
 
 
 Mi(i::Int) = if i>0 2^i+1 else 0 end

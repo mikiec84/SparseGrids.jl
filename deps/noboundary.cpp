@@ -8,11 +8,7 @@ inline double nblastXi(int mi)
     return double(mi)/double(mi+1);
 }
 
-
-
-
-
- double basis_func_nb (double x, double xij, int mi)
+double basis_func_nb (double x, double xij, int mi)
 {
     if (mi==1)
         return 1.0;
@@ -34,8 +30,8 @@ inline double nblastXi(int mi)
         }
         else
         {
-            if (abs(x-xij)<1/(mi+1.))
-                return 1.-(mi+1.)*abs(x-xij);
+            if (fabs(x-xij)<1/(mi+1.))
+                return 1.-(mi+1.)*fabs(x-xij);
             else
                 return 0.0;
 
@@ -112,9 +108,9 @@ void w_get_inv_nb(double *grid, int nG, int D, int *lvl_s, int *lvl_l, double *A
             {
                 for (j=0;j<nG;j++)
                 {
-                    w[i+nG*j] = A[i+nG*j] - Aold[i+nG*j];    
+                    w[i+nG*j] = A[i+nG*j] - Aold[i+nG*j];
                 }
-                
+
             }
         }
         else
@@ -123,7 +119,7 @@ void w_get_inv_nb(double *grid, int nG, int D, int *lvl_s, int *lvl_l, double *A
             {
                 for (j=0;j<nG;j++)
                 {
-                    w[i+nG*j] = A[i+nG*j] - Aold[i+nG*j];    
+                    w[i+nG*j] = A[i+nG*j] - Aold[i+nG*j];
                 }
             }
         }
