@@ -3,6 +3,7 @@ import Base.show
 export CurtisClenshaw,
 	   NoBoundary,
 	   Maximum,
+	   FullLinear,
 	   interp,
 	   getW,
 	   getWinv,
@@ -13,6 +14,8 @@ export CurtisClenshaw,
 include("curtisclenshaw.jl")
 include("noboundary.jl")
 include("maximum.jl")
+include("fulllinear.jl")
+include("fullquad.jl")
 
 getWinvC(G::CurtisClenshaw.Grid) = CurtisClenshaw.getWinvC(G)
 getWinvC(G::NoBoundary.Grid) = NoBoundary.getWinvC(G)
@@ -29,6 +32,9 @@ for g in (CurtisClenshaw,Maximum,NoBoundary)
 	@eval shrink!(G::$g.Grid,id::Vector{Bool}) 							= $g.shrink!(G,id)
 	@eval show(io::IO,G::$g.Grid) 										= println(io,typeof(G)," {",G.d,",",G.q,"}[",G.n,"]")
 end
+
+interp(xi::Array{Float64,2},G::FullLinear.Grid,A::Array{Float64,1}) 	= FullLinear.interp(xi,G,A)
+interp(xi::Array{Float64,2},G::FullQuad.Grid,A::Array{Float64,1}) 	= FullQuad.interp(xi,G,A)
 
 
 end
