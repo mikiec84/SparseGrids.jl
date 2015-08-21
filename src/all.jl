@@ -1,7 +1,7 @@
 include("combinatorics.jl")
 include("conversion.jl")
 const libsparse = @windows ? "libsparse" : "libsparse.so"
-
+import Base.-
 immutable Index
 	x::Vector{Int}
 end
@@ -312,9 +312,7 @@ function grow!(G::Grid,id::Int,bounds::Vector{Int})
     G.active[id]=false
     targ = G.grid[id,:]
 
-
     newX = nodes(Index(min(ones(Int,G.d)*(G.level[id]+1),bounds)),G.level[id]+1)
-
 
     if length(newX)==0
     	return
