@@ -5,6 +5,7 @@ export CurtisClenshaw,
 	   Maximum,
 	   FullLinear,
 	   FullQuad,
+	   RadialSqrtCC,
 	   interp,
 	   getW,
 	   getWinv,
@@ -17,6 +18,7 @@ include("noboundary.jl")
 include("maximum.jl")
 include("fulllinear.jl")
 include("fullquad.jl")
+include("radialsqrtcc.jl")
 
 getWinvC(G::CurtisClenshaw.Grid) = CurtisClenshaw.getWinvC(G)
 getWinvC(G::NoBoundary.Grid) = NoBoundary.getWinvC(G)
@@ -36,6 +38,7 @@ end
 
 interp(xi::Array{Float64,2},G::FullLinear.Grid,A::Array{Float64,1}) 	= FullLinear.interp(xi,G,A)
 interp(xi::Array{Float64,2},G::FullQuad.Grid,A::Array{Float64,1}) 	= FullQuad.interp(xi,G,A)
+interp(xi::Array{Float64,2},G::RadialSqrtCC.Grid,A::Array{Float64,1}) 	= RadialSqrtCC.interp(xi,G,A)
 
 
 end

@@ -1,3 +1,92 @@
+module RadialSqrtCC
+@windows ? (begin
+const libwget 	= :w_get_l
+const libwgetinv= :w_get_inv_l
+const libinterp = :sparse_interp_l
+end
+:begin
+const libwget 	= :_Z7w_get_lPdiiPiS0_S_iS_S_S_
+const libwgetinv=:_Z11w_get_inv_lPdiiPiS0_S_iS_S_S_
+const libinterp = :_Z15sparse_interp_lPdiS_iiPiS0_S_iS_S_S_
+end)
+
+Mi(i::Int) = (i==1) ? 1 : 2^(i-1)+1
+
+function dMi(i::Int64)
+	if (i==1)
+		return 1
+	elseif (i==2)
+		return 2
+	else
+		return 2^(i-2)
+	end
+end
+
+xi(i::Int,j::Int) = (i==1) ? 0.5 : (j-1)/(Mi(i)-1.0)
+
+
+function dxi(i::Int64,j::Int64)
+	if (i==1)
+		return 0.5
+	elseif (i==2)
+		if (j==1)
+			return 0.0;
+		else
+			return 1.0;
+		end
+	else
+		return ((j)*2.0-1.0)/(Mi(i)-1.0)
+	end
+end
+
+Xi(i::Int) = (i==1) ? [0.5] : collect(linspace(0,1,Mi(i)))
+
+
+function dXi(i::Int64)
+	dM 	= dMi(i)
+	M  	= Mi(i)
+	X  	= Array(Float64,dM)
+	if (i==1)
+		X = 0.5
+	elseif (i==2)
+		X = [0.0,1.0]
+	else
+		for ii = 1:dM
+			X[ii] = ((ii)*2.0-1.0)/(M-1.0)
+		end
+	end
+	return X
+end
+
+function getind(grid::Array{Float64},q::Int)
+	dim = size(grid,2)
+	nG = size(grid,1)
+	ind = fill!(Array(Int64,nG,dim),0)#zeros(nG,dim)
+	for i = 1:nG*dim
+		ind[i]=q
+		for ddi=q+dim:-1:2
+			if mod(grid[i],1/(Mi(ddi)-1))==0.0
+				ind[i] = ddi
+			end
+		end
+		if grid[i]==0.5
+			ind[i] = 1
+		end
+	end
+	return ind
+end
+
+
+function basis_func(x::Float64,xij::Float64,mi::Int32)
+	if (mi==1)
+		return 1.0
+	elseif (abs(x-xij)<(1.0/(mi-1.0)))
+		return (1.0-(mi-1.0)*abs(x-xij))
+	else
+		return 0.0
+	end
+end
+
 include("combinatorics.jl")
 include("conversion.jl")
 const libsparse = @windows ? "libsparse" : "libsparse.so"
@@ -171,135 +260,128 @@ Base.values(G::Grid)= nUtoX(G.grid,G.bounds)
 Base.values(G::Grid,i::Int)= UtoX(G.grid[:,i],G.bounds[:,i])
 
 function interp(x1::Array{Float64},G::Grid,A::Vector{Float64})
+	ϵ = 1.0
 	x = nXtoU(x1,G.bounds)
-	x=clamp(x,0.0,1.0)
-	nx = size(x,1)
-
-	Aold = zeros(G.n)
-	dA = zeros(G.n)
-	w = zeros(G.n)
-
-    ccall((libwget, libsparse),
-		Void,
-		(Ptr{Float64},Int32,Int32,Ptr{Int64},Ptr{Int32},Ptr{Float64},Int32,Ptr{Float64},Ptr{Float64},Ptr{Float64}),
-		pointer(G.grid),G.n,G.d,pointer(G.lvl_s),pointer(G.lvl_l),pointer(A),G.q,pointer(Aold),pointer(dA),pointer(w))
-
-	xold = zeros(nx)
-	dx = zeros(nx)
-	ccall((libinterp, libsparse),
-		Void,
-		(Ptr{Float64},Int32,Ptr{Float64},Int32,Int32,
-		Ptr{Float64},Ptr{Float64},Ptr{Float64},Int32,Ptr{Float64},
-		Ptr{Float64},Ptr{Float64}),
-		pointer(x),nx,pointer(G.grid),G.n,G.d,
-		pointer(G.lvl_s),pointer(G.lvl_l),pointer(A),G.q,pointer(w),
-		pointer(xold),pointer(dx))
-	yi = vec(xold)
-	return yi
-end
-
-function getW(G::Grid,A)
-	Aold = zeros(G.n)
-	dA = zeros(G.n)
-	w = zeros(G.n)
-	ccall((libwget, libsparse),
-		Void,
-		(Ptr{Float64},Int32,Int32,Ptr{Float64},Ptr{Float64},Ptr{Float64},Int32,Ptr{Float64},Ptr{Float64},Ptr{Float64}),
-		pointer(G.grid),G.n,G.d,pointer(G.lvl_s),pointer(G.lvl_l),pointer(A),G.q,pointer(Aold),pointer(dA),pointer(w))
-	return w
-end
-
-function getWinv(G::Grid)
-	drange=collect(1:G.d)
-	qA= eye(G.n)
-	qAold = zeros(G.n,G.n)
-	qw= zeros(G.n,G.n)
-	qtemp = zeros(G.n)
-
-	for i = 1:G.lvl_l[1]-1
-		@simd for j = 1:G.n
-		    @inbounds qw[i,j] = qA[i,j] - qAold[i,j]
-		end
-    end
-    for i in 1:G.n
-    	fill!(qtemp,0)
-        for ii in 1:G.lvl_l[1]-1
-            temp2=1.0
-            for d in drange
-                @inbounds temp2 *= basis_func(G.grid[i,d],G.grid[ii,d],G.lvl_s[ii,d])
-            end
-            @simd for j = 1:G.n
-	            @inbounds qtemp[j] += temp2*qw[ii,j]
-	        end
-        end
-
-	    @simd for j = 1:G.n
-		    @inbounds qAold[i,j] += qtemp[j]
-		end
-    end
-
-	for q in 1:G.q
-	    for i = G.lvl_l[q]:G.lvl_l[q+1]-1
-	    	@simd for j = 1:G.n
-		        @inbounds qw[i,j] = qA[i,j] - qAold[i,j]
-		    end
-	    end
-	    for i in G.lvl_l[q]:G.n
-	        fill!(qtemp,0)
-	        for ii in G.lvl_l[q]:G.lvl_l[q+1]-1
-	            temp2=1.0
-	            for d in drange
-	                @inbounds temp2 *= basis_func(G.grid[i,d],G.grid[ii,d],G.lvl_s[ii,d])
-	            end
-	            @simd for j = 1:G.n
-		            @inbounds qtemp[j] += temp2*qw[ii,j]
-		        end
-	        end
-	        @simd for j = 1:G.n
-			    @inbounds qAold[i,j] += qtemp[j]
-			end
-	    end
-	end
-   return sparse(qw)
-end
-
-function getWinvC(G::Grid)
-	Aold = zeros(G.n,G.n)
-	dA = zeros(G.n,G.n)
-	w = zeros(G.n,G.n)
-	A = eye(G.n,G.n)
-	grid = deepcopy(G.grid)
-	ccall((libwgetinv, libsparse),
-		Void,
-		(Ptr{Float64},Int32,Int32,Ptr{Float64},Ptr{Float64},Ptr{Float64},Int32,Ptr{Float64},Ptr{Float64},Ptr{Float64}),
-		pointer(grid),G.n,G.d,pointer(G.lvl_s),pointer(G.lvl_l),pointer(A),G.q,pointer(Aold),pointer(dA),pointer(w))
-	return sparse(w)
-end
-
-function getQ(xi1::Array{Float64},G::Grid)
-    xi = nXtoU(xi1,G.bounds)
-    xi[xi.>1]=1.0
-    xi[xi.<0]=0.0
-    nx = size(xi,1)
-
-    lvl_l = [1;G.lvl_l]
-
-    Q = spzeros(nx,G.n)
-    drange=collect(1:G.d)
-    for i in 1:nx
-        for q in 0:G.q
-            for ii in lvl_l[q+1]:lvl_l[q+2]-1
-                temp2=1.0
-                for d in drange
-                    @inbounds temp2 *= basis_func(xi[i,d],G.grid[ii,d],G.lvl_s[ii,d])
-
-                end
-                Q[i,ii]+=temp2
-            end
+	Gm = eye(G.n)
+    for i = 2:G.n
+        for j = 1:i-1
+            Gm[i,j]=exp(-(ϵ*norm(G.grid[i,:]-G.grid[j,:]))^2)
+            Gm[j,i]=Gm[i,j]
         end
     end
-   return Q
+	w =  Gm\A
+    g = Array(Float64,size(x,1),G.n)
+    for i = 1:size(x,1)
+        for j = 1:G.n
+            g[i,j]=exp(-(ϵ*norm(x[i,:]-G.grid[j,:]))^2)
+        end
+    end
+    return g*w
 end
+
+
+# function getW(G::Grid,A)
+# 	Aold = zeros(G.n)
+# 	dA = zeros(G.n)
+# 	w = zeros(G.n)
+# 	ccall((libwget, libsparse),
+# 		Void,
+# 		(Ptr{Float64},Int32,Int32,Ptr{Float64},Ptr{Float64},Ptr{Float64},Int32,Ptr{Float64},Ptr{Float64},Ptr{Float64}),
+# 		pointer(G.grid),G.n,G.d,pointer(G.lvl_s),pointer(G.lvl_l),pointer(A),G.q,pointer(Aold),pointer(dA),pointer(w))
+# 	return w
+# end
+
+# function getWinv(G::Grid)
+# 	drange=collect(1:G.d)
+# 	qA= eye(G.n)
+# 	qAold = zeros(G.n,G.n)
+# 	qw= zeros(G.n,G.n)
+# 	qtemp = zeros(G.n)
+#
+# 	for i = 1:G.lvl_l[1]-1
+# 		@simd for j = 1:G.n
+# 		    @inbounds qw[i,j] = qA[i,j] - qAold[i,j]
+# 		end
+#     end
+#     for i in 1:G.n
+#     	fill!(qtemp,0)
+#         for ii in 1:G.lvl_l[1]-1
+#             temp2=1.0
+#             for d in drange
+#                 @inbounds temp2 *= basis_func(G.grid[i,d],G.grid[ii,d],G.lvl_s[ii,d])
+#             end
+#             @simd for j = 1:G.n
+# 	            @inbounds qtemp[j] += temp2*qw[ii,j]
+# 	        end
+#         end
+#
+# 	    @simd for j = 1:G.n
+# 		    @inbounds qAold[i,j] += qtemp[j]
+# 		end
+#     end
+#
+# 	for q in 1:G.q
+# 	    for i = G.lvl_l[q]:G.lvl_l[q+1]-1
+# 	    	@simd for j = 1:G.n
+# 		        @inbounds qw[i,j] = qA[i,j] - qAold[i,j]
+# 		    end
+# 	    end
+# 	    for i in G.lvl_l[q]:G.n
+# 	        fill!(qtemp,0)
+# 	        for ii in G.lvl_l[q]:G.lvl_l[q+1]-1
+# 	            temp2=1.0
+# 	            for d in drange
+# 	                @inbounds temp2 *= basis_func(G.grid[i,d],G.grid[ii,d],G.lvl_s[ii,d])
+# 	            end
+# 	            @simd for j = 1:G.n
+# 		            @inbounds qtemp[j] += temp2*qw[ii,j]
+# 		        end
+# 	        end
+# 	        @simd for j = 1:G.n
+# 			    @inbounds qAold[i,j] += qtemp[j]
+# 			end
+# 	    end
+# 	end
+#    return sparse(qw)
+# end
+
+# function getWinvC(G::Grid)
+# 	Aold = zeros(G.n,G.n)
+# 	dA = zeros(G.n,G.n)
+# 	w = zeros(G.n,G.n)
+# 	A = eye(G.n,G.n)
+# 	grid = deepcopy(G.grid)
+# 	ccall((libwgetinv, libsparse),
+# 		Void,
+# 		(Ptr{Float64},Int32,Int32,Ptr{Float64},Ptr{Float64},Ptr{Float64},Int32,Ptr{Float64},Ptr{Float64},Ptr{Float64}),
+# 		pointer(grid),G.n,G.d,pointer(G.lvl_s),pointer(G.lvl_l),pointer(A),G.q,pointer(Aold),pointer(dA),pointer(w))
+# 	return sparse(w)
+# end
+
+# function getQ(xi1::Array{Float64},G::Grid)
+#     xi = nXtoU(xi1,G.bounds)
+#     xi[xi.>1]=1.0
+#     xi[xi.<0]=0.0
+#     nx = size(xi,1)
+#
+#     lvl_l = [1;G.lvl_l]
+#
+#     Q = spzeros(nx,G.n)
+#     drange=collect(1:G.d)
+#     for i in 1:nx
+#         for q in 0:G.q
+#             for ii in lvl_l[q+1]:lvl_l[q+2]-1
+#                 temp2=1.0
+#                 for d in drange
+#                     @inbounds temp2 *= basis_func(xi[i,d],G.grid[ii,d],G.lvl_s[ii,d])
+#
+#                 end
+#                 Q[i,ii]+=temp2
+#             end
+#         end
+#     end
+#    return Q
+# end
 
 function grow!(G::Grid,ids::Vector{Int},bounds::Vector{Int})
 	locs = G.grid[ids,:]
@@ -376,4 +458,8 @@ function shrink!(G::Grid,id::Vector{Bool})
     G.lvl_s = convert(Array{Int32},map(Mi,G.index))
     G.q = maximum(G.level)
     return nothing
+end
+
+
+
 end
