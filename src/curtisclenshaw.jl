@@ -87,6 +87,16 @@ function basis_func(x::Float64,xij::Float64,mi::Int32)
 	end
 end
 
+function basis_func(x::Float64,xij::Float64,mi::Float64)
+	if (mi==1.0)
+		return 1.0
+	elseif (abs(x-xij)<(1.0/(mi-1.0)))
+		return (1.0-(mi-1.0)*abs(x-xij))
+	else
+		return 0.0
+	end
+end
+
 include("all.jl")
 
 
