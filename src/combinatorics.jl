@@ -49,7 +49,7 @@ function comb(D::Int,Q::Int)
 	end
 	Pq = partitions(Q)
 	out = Array(Vector{Int},0)
-	
+
 	for p in Pq
 		if length(p)==D
 			pPq=get_perms(p)
@@ -58,6 +58,6 @@ function comb(D::Int,Q::Int)
 			end
 		end
 	end
-	
+
 	return [Index(x) for x in out]
 end

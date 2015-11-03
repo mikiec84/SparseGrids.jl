@@ -38,7 +38,7 @@ Base.size(x::Node) = length(x.x)
 function Base.size(I::Index)
 	out = 1
 	for i = 1:length(I)
-		out *= dMi(I.x[i])
+		out *= dM(I.x[i])
 	end
 	return out
 end
@@ -46,7 +46,7 @@ end
 function Nodes(I::Index)
 	dim = length(I)
 	vs = [dXi(I.x[i]) for i = 1:dim]
-    sz = map(dMi,I.x)
+    sz = map(dM,I.x)
     out = Array(Node,prod(sz))
     for i in eachindex(out)
     	@inbounds out[i] = Node(zeros(dim),sum(I.x)-dim,I)
@@ -161,7 +161,7 @@ function Grid(Q::Vector{Int},bounds::Array{Float64,2})
 				index,
 				level,
 				[[findfirst(level.==i) for i = 1:q];length(x)+1],
-				map(Mi,index),
+				map(M,index),
 				bounds,
 				ones(Bool,N))
 
@@ -360,7 +360,7 @@ function grow!(G::Grid,id::Int,bounds::Vector{Int})
 	G.n = size(G.grid,1)
 	G.q = maximum(G.level)
     G.lvl_l=[[findfirst(G.level.==i) for i = 1:maximum(G.level)];G.n+1]
-    G.lvl_s = convert(Array{Float64},map(Mi,G.index))
+    G.lvl_s = convert(Array{Float64},map(M,G.index))
 
     return nothing
 end
@@ -373,7 +373,7 @@ function shrink!(G::Grid,id::Vector{Bool})
 	G.level=G.level[id]
 	G.n = length(G.level)
 	G.lvl_l=[[findfirst(G.level.==i) for i = 1:maximum(G.level)];G.n+1]
-    G.lvl_s = convert(Array{Int32},map(Mi,G.index))
+    G.lvl_s = convert(Array{Int32},map(M,G.index))
     G.q = maximum(G.level)
     return nothing
 end

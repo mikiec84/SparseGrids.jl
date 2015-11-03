@@ -11,11 +11,11 @@ const libinterp = :_Z17sparse_interp_maxPdiS_iiPiS0_S_iS_S_S_
 end)
 
 
-Mi(i::Int) = if i>0 2^i+1 else 0 end
-dMi(i::Int) = Mi(i)-Mi(i-1)
-xi(i::Int,j::Int) = (j-1)/(Mi(i)-1)
+M(i::Int) = if i>0 2^i+1 else 0 end
+dM(i::Int) = M(i)-M(i-1)
+xi(i::Int,j::Int) = (j-1)/(M(i)-1)
 dxi(i::Int,j::Int) = dXi(i)[j]
-Xi(i::Int64)=[xi(i,j) for j = 1:Mi(i)]
+Xi(i::Int64)=[xi(i,j) for j = 1:M(i)]
 dXi(i::Int) = setdiff(Xi(i),Xi(i-1))
 
 function getind(grid::Array{Float64},q::Int64)

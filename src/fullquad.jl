@@ -33,7 +33,7 @@ function ndgrid{T}(vs::AbstractVector{T}...)
 end
 
 include("conversion.jl")
-Mi(i::Int) = (i==1) ? 1 : 2^(i-1)+1
+M(i::Int) = (i==1) ? 1 : 2^(i-1)+1
 
 type Grid
 	d::Int64
@@ -52,10 +52,10 @@ function Grid(Q::Vector{Int},bounds::Array{Float64,2})
 	if all(bounds.==0.0)
 		bounds = [zeros(1,d);ones(1,d)]
 	end
-	X = ndgrid(ntuple(i->linspace(bounds[1,i],bounds[2,i],Mi(Q[i]+1)),length(Q))...)
+	X = ndgrid(ntuple(i->linspace(bounds[1,i],bounds[2,i],M(Q[i]+1)),length(Q))...)
 	x = hcat([x[:] for x in X]...)
 	D = length(Q)
-	N = prod(map(Mi,Q+1))
+	N = prod(map(M,Q+1))
 	return Grid(D,maximum(Q),N,x,bounds,ones(Bool,size(x,1)),ones(Int,size(x,1)))
 end
 

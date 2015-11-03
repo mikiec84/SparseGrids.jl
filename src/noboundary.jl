@@ -10,11 +10,11 @@ const libwgetinv= :_Z12w_get_inv_nbPdiiPiS0_S_iS_S_S_
 const libinterp = :_Z16sparse_interp_nbPdiS_iiPiS0_S_iS_S_S_
 end)
 
-Mi(i::Int) = 2^i-1
-dMi(i::Int) = Mi(i)-Mi(i-1)
-xi(i::Int,j::Int) = j/(Mi(i)+1)
+M(i::Int) = 2^i-1
+dM(i::Int) = M(i)-M(i-1)
+xi(i::Int,j::Int) = j/(M(i)+1)
 dxi(i::Int,j::Int) = dXi(i)[j]
-Xi(i::Int64)=[xi(i,j) for j = 1:Mi(i)]
+Xi(i::Int64)=[xi(i,j) for j = 1:M(i)]
 dXi(i::Int) = setdiff(Xi(i),Xi(i-1))
 
 function getind(grid::Array{Float64},q::Int64)
@@ -24,7 +24,7 @@ function getind(grid::Array{Float64},q::Int64)
 	for i = 1:nG*dim
 		ind[i]=q
 		for ddi=q+dim:-1:2
-			if mod(grid[i],1/(Mi(ddi)+1))==0.0
+			if mod(grid[i],1/(M(ddi)+1))==0.0
 				ind[i] = ddi
 			end
 		end
