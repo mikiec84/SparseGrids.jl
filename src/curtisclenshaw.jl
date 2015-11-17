@@ -7,7 +7,7 @@ end
 :begin
 const libwget 	= :_Z7w_get_lPdiiPiS0_S_iS_S_S_
 const libwgetinv=:_Z11w_get_inv_lPdiiPiS0_S_iS_S_S_
-const libinterp = :_Z15sparse_interp_lPdiS_iiPiS0_S_iS_S_S_
+const libinterp = :_Z15sparse_interp_liiiiPdPiS0_S_S_S_S_S0_
 end)
 
 M(i::Int) = (i==1) ? 1 : 2^(i-1)+1

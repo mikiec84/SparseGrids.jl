@@ -206,9 +206,10 @@ void w_get_inv_nb(double *grid, int nG, int D, int *lvl_s, int *lvl_l, double *A
 
 // }
 
-void sparse_interp_nb(double * xi, int nx, double * grid, int nG, int D,
-    int * lvl_s, int * lvl_l, double * A, int Q, double * w,
-    double * xold, double * dx)
+void sparse_interp_nb(int D, int Q, int nG, int nx,
+    double * grid, int * lvl_s, int * lvl_l,
+    double * A,  double * w,
+    double * xi, double * xold, double * dx)
 {
     double temp, temp2;
     int q, i, ii, d;

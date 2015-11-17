@@ -7,7 +7,7 @@ end
 :begin
 const libwget 	= :_Z9w_get_maxPdiiPiS0_S_iS_S_S_
 const libwgetinv = :_Z13w_get_inv_maxPdiiPiS0_S_iS_S_S_
-const libinterp = :_Z17sparse_interp_maxPdiS_iiPiS0_S_iS_S_S_
+const libinterp = :_Z17sparse_interp_maxiiiiPdPiS0_S_S_S_S_S0_
 end)
 
 

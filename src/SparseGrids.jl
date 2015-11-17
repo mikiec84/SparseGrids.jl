@@ -1,4 +1,5 @@
 module SparseGrids
+
 import Base.show
 export CurtisClenshaw,
 	   NoBoundary,

@@ -7,7 +7,7 @@ end
 :begin
 const libwget 	= :_Z8w_get_nbPdiiPiS0_S_iS_S_S_
 const libwgetinv= :_Z12w_get_inv_nbPdiiPiS0_S_iS_S_S_
-const libinterp = :_Z16sparse_interp_nbPdiS_iiPiS0_S_iS_S_S_
+const libinterp = :_Z16sparse_interp_nbiiiiPdPiS0_S_S_S_S_S_
 end)
 
 M(i::Int) = 2^i-1

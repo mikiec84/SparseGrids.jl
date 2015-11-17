@@ -40,7 +40,11 @@ void w_get_max(double *grid, int nG, int D, int *lvl_s, int *lvl_l, double *A, i
                 {
                     temp2 =1;
                     for (d=0;d<D;d++)
+                    {
                         temp2 *= basis_func_max( grid[i+d*nG] , grid[ii+d*nG] , lvl_s[ii+d*nG] );
+                        if (temp2==0.0)
+                            break;
+                    }
                     temp += temp2*w[ii];
                 }
             }
@@ -49,7 +53,11 @@ void w_get_max(double *grid, int nG, int D, int *lvl_s, int *lvl_l, double *A, i
                 {
                     temp2 =1;
                     for (d=0;d<D;d++)
+                    {
                         temp2 *= basis_func_max( grid[i+d*nG] , grid[ii-1+d*nG] , lvl_s[ii-1+d*nG] );
+                        if (temp2==0.0)
+                            break;
+                    }
                     temp += temp2*w[ii-1];
                 }
             }
@@ -74,9 +82,9 @@ void w_get_inv_max(double *grid, int nG, int D, int *lvl_s, int *lvl_l, double *
             {
                 for (j=0;j<nG;j++)
                 {
-                    w[i+nG*j] = A[i+nG*j] - Aold[i+nG*j];    
+                    w[i+nG*j] = A[i+nG*j] - Aold[i+nG*j];
                 }
-                
+
             }
         }
         else
@@ -85,7 +93,7 @@ void w_get_inv_max(double *grid, int nG, int D, int *lvl_s, int *lvl_l, double *
             {
                 for (j=0;j<nG;j++)
                 {
-                    w[i+nG*j] = A[i+nG*j] - Aold[i+nG*j];    
+                    w[i+nG*j] = A[i+nG*j] - Aold[i+nG*j];
                 }
             }
         }
@@ -132,52 +140,65 @@ void w_get_inv_max(double *grid, int nG, int D, int *lvl_s, int *lvl_l, double *
 }
 
 
-void sparse_interp_max(double * xi, int nx, double * grid, int nG, int D,
-    int * lvl_s, int * lvl_l, double * A, int Q, double * w,
-    double * xold, double * dx)
+void sparse_interp_max(int D, int Q, int nG, int nx,
+                      double * grid, int * lvl_s, int * lvl_l,
+                      double * A,  double * w,
+                      double * xi, double * y,
+                      int * nextid)
 {
-    double temp, temp2;
-    int q, i, ii, d;
+    double temp2;
+    int i, ii, d;
 
-
-
-    for (q=0;q<Q+1;q++)
+    #pragma omp parallel for private(ii,temp2,d)
+    for (i=0;i<nx;i++)
     {
-        #pragma omp parallel for private(temp,ii,temp2,d)
-        for (i=0;i<nx;i++)
+        y[i] = 0;
+        ii=1;
+        while (ii<=nG)
         {
-            temp = 0;
-            dx[i] = 0;
-            if (q == 0)
+            temp2 =1.0;
+            for (d=0;d<D;d++)
             {
-                for (ii=0;ii<=lvl_l[0]-2;ii++)
-                {
-                    temp2 =1;
-                    for (d=0;d<D;d++)
-                    {
-                        temp2 *= basis_func_max( xi[i+d*nx] , grid[ii+d*nG] , lvl_s[ii+d*nG] );
-                    }
-                    temp += temp2*w[ii];
-                }
+                temp2 *= basis_func_max( xi[i+d*nx] , grid[ii-1+d*nG] , lvl_s[ii-1+d*nG] );
+                if (temp2==0.0)
+                    break;
             }
-            else
-            {
-                for (ii=lvl_l[q-1];ii<(lvl_l[q]);ii++)
-                {
-                    temp2 =1;
-                    for (d=0;d<D;d++)
-                    {
-                        temp2 *= basis_func_max( xi[i+d*nx] , grid[ii-1+d*nG] , lvl_s[ii-1+d*nG] );
-                    }
-                    temp += temp2*w[ii-1];
-                }
-            }
-            dx[i] = temp;
+            y[i] += temp2*w[ii-1];
+            ii++;
         }
+    }
+}
 
-        #pragma omp parallel for
-        for (i=0;i<nx;i++)
-            xold[i] += dx[i];
 
+
+void sparse_interp_max2(int D, int Q, int nG, int nx,
+                      double * grid, int * lvl_s, int * lvl_l,
+                      double * A,  double * w,
+                      double * xi, double * y,
+                      int * nextid)
+{
+    double temp2;
+    int i, ii, d;
+
+    #pragma omp parallel for private(ii,temp2,d)
+    for (i=0;i<nx;i++)
+    {
+        y[i] += w[0];
+        ii=1;
+        while (ii<=nG)
+        {
+            temp2 =1.0;
+            for (d=0;d<D;d++)
+            {
+                temp2 *= basis_func_max( xi[i+d*nx] , grid[ii-1+d*nG] , lvl_s[ii-1+d*nG] );
+                if (temp2==0.0)
+                    break;
+            }
+            y[i] += temp2*w[ii-1];
+            if (temp2==0.0)
+                ii+=1;
+            else
+                ii=nextid[ii-1];
+        }
     }
 }

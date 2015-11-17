@@ -47,7 +47,7 @@ function comb(D::Int,Q::Int)
 	if D ==1
 		return [Index([Q])]
 	end
-	Pq = partitions(Q)
+	Pq = Combinatorics.integer_partitions(Q)
 	out = Array(Vector{Int},0)
 
 	for p in Pq

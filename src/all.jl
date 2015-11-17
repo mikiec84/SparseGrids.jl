@@ -1,9 +1,22 @@
+using Combinatorics
 include("combinatorics.jl")
 include("conversion.jl")
 const libsparse = @windows ? "libsparse" : "libsparse.so"
-import Base.-
+import Base:-,size,length,maximum
+
 immutable Index
 	x::Vector{Int}
+end
+Index(args...) = Index(collect(args))
+length(I::Index) = length(I.x)
+maximum(I::Index) = maximum(I.x)
+-(I::Index,i::Int) = Index(I.x-i)
+function size(I::Index)
+	out = 1
+	for i = 1:length(I)
+		out *= dM(I.x[i])
+	end
+	return out
 end
 
 type Node
@@ -11,6 +24,7 @@ type Node
 	level::Int
 	index::Index
 end
+size(x::Node) = length(x.x)
 
 
 
@@ -25,17 +39,15 @@ type Grid
 	lvl_s::Array{Int32,2}
 	bounds::Array{Float64,2}
 	active::Vector{Bool}
+	nextid::Vector{Int32}
 end
 
 
 Node(G::Grid)= Node[Node(vec(G.grid[i,:]),G.level[i],Index(vec(G.index[i,:]))) for i = 1:G.n]
 
-Base.length(I::Index) = length(I.x)
-Base.maximum(I::Index) = maximum(I.x)
-Base.size(x::Node) = length(x.x)
--(I::Index,i::Int) = Index(I.x-i)
 
-function Base.size(I::Index)
+
+function size(I::Index)
 	out = 1
 	for i = 1:length(I)
 		out *= dM(I.x[i])
@@ -163,12 +175,24 @@ function Grid(Q::Vector{Int},bounds::Array{Float64,2})
 				[[findfirst(level.==i) for i = 1:q];length(x)+1],
 				map(M,index),
 				bounds,
-				ones(Bool,N))
+				ones(Bool,N),
+				getnextid(index))
 
+end
+
+function getnextid(index::Array{Int})
+	C = unique(index,1)
+	Cl = Vector{Int}[(1:size(index,1))[vec(all(index.==C[i,:]',2))] for i = 1:size(C,1)]
+	itoCi = [findfirst([in(i,c) for c in Cl]) for i = 1:size(index,1)]
+	nextid=Int[findfirst(itoCi.>itoCi[i]) for i = 1:size(index,1)]
+	nextid[nextid.==0]=size(index,1)+1
+	nextid=map(Int32,nextid)
+	return nextid
 end
 
 Base.values(G::Grid)= nUtoX(G.grid,G.bounds)
 Base.values(G::Grid,i::Int)= UtoX(G.grid[:,i],G.bounds[:,i])
+
 
 function interp(x1::Array{Float64},G::Grid,A::Vector{Float64})
 	x = nXtoU(x1,G.bounds)
@@ -187,16 +211,22 @@ function interp(x1::Array{Float64},G::Grid,A::Vector{Float64})
 	xold = zeros(nx)
 	dx = zeros(nx)
 	ccall((libinterp, libsparse),
-		Void,
-		(Ptr{Float64},Int32,Ptr{Float64},Int32,Int32,
-		Ptr{Float64},Ptr{Float64},Ptr{Float64},Int32,Ptr{Float64},
-		Ptr{Float64},Ptr{Float64}),
-		pointer(x),nx,pointer(G.grid),G.n,G.d,
-		pointer(G.lvl_s),pointer(G.lvl_l),pointer(A),G.q,pointer(w),
-		pointer(xold),pointer(dx))
+			Void,
+			(Int32,Int32,Int32,Int32,
+			Ptr{Float64},Ptr{Float64},Ptr{Float64},
+			Ptr{Float64},Ptr{Float64},
+			Ptr{Float64},Ptr{Float64},
+			Ptr{Float64}),
+			G.d,G.q,G.n,nx,
+			pointer(G.grid),pointer(G.lvl_s),pointer(G.lvl_l),
+			pointer(A),pointer(w),
+			pointer(x),pointer(xold),
+			pointer(G.nextid))
+
 	yi = vec(xold)
 	return yi
 end
+
 
 function getW(G::Grid,A)
 	Aold = zeros(G.n)
@@ -351,29 +381,50 @@ function grow!(G::Grid,id::Int,bounds::Vector{Int})
     G.index = [G.index;hcat(Array{Int}[x.index.x for x in newX]...)']
     G.level = [G.level;Int[x.level for x in newX]]
     G.active = [G.active;ones(Bool,length(newX))]
+	G.nextid = getnextid(G.index)
     sid = sortperm(G.level)
+	sid = sortperm(G.nextid)
     G.grid = G.grid[sid,:]
     G.index = G.index[sid,:]
     G.level = G.level[sid]
 	G.active = G.active[sid]
+	G.nextid = G.nextid[sid]
 
 	G.n = size(G.grid,1)
 	G.q = maximum(G.level)
     G.lvl_l=[[findfirst(G.level.==i) for i = 1:maximum(G.level)];G.n+1]
     G.lvl_s = convert(Array{Float64},map(M,G.index))
+	G.nextid = getnextid(G.index)
 
     return nothing
 end
 
 function shrink!(G::Grid,id::Vector{Bool})
-
-	G.grid=G.grid[id,:]
-	G.active=G.active[id]
-	G.index=G.index[id,:]
-	G.level=G.level[id]
+	G.grid=G.grid[!id,:]
+	G.active=G.active[!id]
+	G.index=G.index[!id,:]
+	G.level=G.level[!id]
 	G.n = length(G.level)
 	G.lvl_l=[[findfirst(G.level.==i) for i = 1:maximum(G.level)];G.n+1]
     G.lvl_s = convert(Array{Int32},map(M,G.index))
     G.q = maximum(G.level)
+	G.nextid = getnextid(G.index)
     return nothing
+end
+
+function interpsafe(xi::Array{Float64},G::Grid,A::Vector{Float64})
+    w = getW(G,A)
+    nx = size(xi,1)
+    y = zeros(nx)+w[1]
+    for i = 1:nx
+        for ii = 2:G.n
+            temp2 = 1.0
+            for d = 1:G.d
+                temp2 *= basis_func(xi[i,d],G.grid[ii,d],G.lvl_s[ii,d])
+				temp2==0.0 ? break : nothing
+            end
+            y[i]+= temp2*w[ii]
+        end
+    end
+    y
 end
