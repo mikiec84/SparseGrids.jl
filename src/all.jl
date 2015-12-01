@@ -331,16 +331,16 @@ function getQ(xi1::Array{Float64},G::Grid)
    return Q
 end
 
+
+
+
 function grow!(G::Grid,ids::Vector{Int},bounds::Vector{Int})
 	locs = G.grid[ids,:]
 	for i = 1:size(locs,1)
-		id = findfirst(prod(G.grid.==locs[i,:],2))
+		id = findfirst(prod(G.grid.==locs[i:i,:],2))
 		grow!(G,id,bounds)
 	end
 end
-
-
-
 
 function grow!(G::Grid,id::Int,bounds::Vector{Int})
 	@assert id≤G.n
@@ -399,11 +399,11 @@ function grow!(G::Grid,id::Int,bounds::Vector{Int})
     return nothing
 end
 
-function shrink!(G::Grid,id::Vector{Bool})
-	G.grid=G.grid[!id,:]
-	G.active=G.active[!id]
-	G.index=G.index[!id,:]
-	G.level=G.level[!id]
+function shrink!(G::Grid,id::Vector{Int})
+	G.grid=G.grid[id,:]
+	G.active=G.active[id]
+	G.index=G.index[id,:]
+	G.level=G.level[id]
 	G.n = length(G.level)
 	G.lvl_l=[[findfirst(G.level.==i) for i = 1:maximum(G.level)];G.n+1]
     G.lvl_s = convert(Array{Int32},map(M,G.index))
@@ -416,7 +416,7 @@ function interpsafe(xi::Array{Float64},G::Grid,A::Vector{Float64})
     w = getW(G,A)
     nx = size(xi,1)
     y = zeros(nx)+w[1]
-    for i = 1:nx
+    Base.Threads.@threads all for i = 1:nx
         for ii = 2:G.n
             temp2 = 1.0
             for d = 1:G.d
