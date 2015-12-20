@@ -3,11 +3,13 @@ module CurtisClenshaw
 const libwget 	= :w_get_l
 const libwgetinv= :w_get_inv_l
 const libinterp = :sparse_interp_l
+const libinterpbig= :_Z12interp_l_biglllllPdS_S_PlS0_S0_S0_
 end
 :begin
 const libwget 	= :_Z7w_get_lPdiiPiS0_S_iS_S_S_
 const libwgetinv=:_Z11w_get_inv_lPdiiPiS0_S_iS_S_S_
 const libinterp = :_Z15sparse_interp_liiiiPdPiS0_S_S_S_S_S0_
+const libinterpbig= :_Z12interp_l_biglllllPdS_S_PlS0_S0_S0_
 end)
 
 M(i::Int) = (i==1) ? 1 : 2^(i-1)+1

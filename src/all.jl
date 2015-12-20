@@ -4,6 +4,29 @@ include("conversion.jl")
 const libsparse = @windows ? "libsparse" : "libsparse.so"
 import Base:-,size,length,maximum
 
+function hsh(x::Vector{Int})
+	h = x[1]*17
+	for i = 2:length(x)
+		h+=x[i]
+		h*=17
+	end
+	h
+end
+
+function indexshift(i::Int,j::Int,q::Int)
+	if i ==1
+		return div(M(q)-1,2)+1
+	elseif i==2
+		if j==1
+			return 1
+		else
+			return M(q)
+		end
+	else
+		return div((M(q)-1)*(j*2-1),M(i)-1)+1
+	end
+end
+
 immutable Index
 	x::Vector{Int}
 end
@@ -26,8 +49,6 @@ type Node
 end
 size(x::Node) = length(x.x)
 
-
-
 type Grid
 	d::Int64
 	q::Int64
@@ -40,20 +61,15 @@ type Grid
 	bounds::Array{Float64,2}
 	active::Vector{Bool}
 	nextid::Vector{Int32}
+	combs::Array{Int}
+	combsl::Vector{Int}
+	combsu::Vector{Int}
+	hGji::Vector{Int}
 end
 
 
 Node(G::Grid)= Node[Node(vec(G.grid[i,:]),G.level[i],Index(vec(G.index[i,:]))) for i = 1:G.n]
 
-
-
-function size(I::Index)
-	out = 1
-	for i = 1:length(I)
-		out *= dM(I.x[i])
-	end
-	return out
-end
 
 function Nodes(I::Index)
 	dim = length(I)
@@ -137,7 +153,6 @@ function nodes(Q::Index,q::Int)
 	for j = 1:Ninds
 		tseq = inds[j]
 		new_grid_size = size(tseq)
-		# GRID[next_ind+1:next_ind+new_grid_size] = Nodes(tseq)
 		GRID = [GRID;Nodes(tseq)]
 		next_ind += new_grid_size
 	end
@@ -146,9 +161,9 @@ function nodes(Q::Index,q::Int)
 end
 
 
-
 Grid(D::Int,Q::Int,bounds = [zeros(1,D);ones(1,D)]) =	Grid(ones(Int,D)*Q,bounds)
 Grid(D::Int,Q::Vector{Int},bounds = [zeros(1,D);ones(1,D)]) = Grid(Q,bounds)
+Grid(Q::Vector{Int},bounds = [zeros(1,length(Q));ones(1,length(Q))]) = Grid(length(Q),Q,bounds)
 
 function Grid(Q::Vector{Int},bounds::Array{Float64,2})
 	if all(bounds.==0.0)
@@ -166,6 +181,20 @@ function Grid(Q::Vector{Int},bounds::Array{Float64,2})
 		level[i]= x[i].level
 	end
 	q = maximum(level)
+	lvl_l = [[findfirst(level.==i) for i = 1:q];length(x)+1]
+
+	levels	= [UnitRange(lvl_l[i-1]+0,lvl_l[i]-1) for i = 2:length(lvl_l)]
+	combs 	= vcat(index[1:1,:],[unique(index[i,:],1) for i in levels]...)
+	nc 		= size(combs,1)
+	combl 	= Tuple{Int,Int}[(findfirst(all(combs[i:i,:].==index,2)),findlast(all(combs[i:i,:].==index,2))) for i = 1:size(combs,1)]
+	combsl = Int[(combl[i][1]) for i = 1:nc]
+	combsu = Int[(combl[i][2]) for i = 1:nc]
+
+	Gji = zeros(Int,size(grid))
+	for i ∈ 1:N
+	   Gji[i,:] = [indexshift(index[i,d],clamp(round(Int,grid[i,d]*(dM(index[i,d]))+1/2),1,dM(index[i,d])),maximum(index)) for d = 1:D]
+	end
+	hGji = vcat([hsh(Gji[i,:]) for i = 1:N]...)
 	return Grid(D,
 				q,
 				N,
@@ -176,7 +205,11 @@ function Grid(Q::Vector{Int},bounds::Array{Float64,2})
 				map(M,index),
 				bounds,
 				ones(Bool,N),
-				getnextid(index))
+				getnextid(index),
+				combs,
+				combsl,
+				combsu,
+				hGji)
 
 end
 
@@ -195,21 +228,13 @@ Base.values(G::Grid,i::Int)= UtoX(G.grid[:,i],G.bounds[:,i])
 
 
 function interp(x1::Array{Float64},G::Grid,A::Vector{Float64})
-	x = nXtoU(x1,G.bounds)
-	x=clamp(x,0.0,1.0)
-	nx = size(x,1)
+	x 		= nXtoU(x1,G.bounds)
+	clamp!(x,0.0,1.0)
+	nx 		= size(x,1)
+	w = getW(G,A)
 
-	Aold = zeros(G.n)
-	dA = zeros(G.n)
-	w = zeros(G.n)
-
-    ccall((libwget, libsparse),
-		Void,
-		(Ptr{Float64},Int32,Int32,Ptr{Int64},Ptr{Int32},Ptr{Float64},Int32,Ptr{Float64},Ptr{Float64},Ptr{Float64}),
-		pointer(G.grid),G.n,G.d,pointer(G.lvl_s),pointer(G.lvl_l),pointer(A),G.q,pointer(Aold),pointer(dA),pointer(w))
-
-	xold = zeros(nx)
-	dx = zeros(nx)
+	xold 	= zeros(nx)
+	dx 		= zeros(nx)
 	ccall((libinterp, libsparse),
 			Void,
 			(Int32,Int32,Int32,Int32,
@@ -223,15 +248,29 @@ function interp(x1::Array{Float64},G::Grid,A::Vector{Float64})
 			pointer(x),pointer(xold),
 			pointer(G.nextid))
 
-	yi = vec(xold)
+	yi 		= vec(xold)
 	return yi
+end
+
+function interpbig(x1::Array{Float64,2},G::Grid,A::Vector{Float64})
+	y = zeros(size(x1,1))
+	w = getW(G,A)
+	x 		= nXtoU(x1,G.bounds)
+	clamp!(x,0.0,1.0)
+
+
+	ccall((libinterpbig,"libsparse.so"),Void,
+	(Int32,Int32,Int32,Int32,Int32,
+	Ptr{Float64},Ptr{Float64},Ptr{Float64},Ptr{Int32},Ptr{Int32},Ptr{Int},Ptr{Int}),
+	G.d,G.q,G.n,size(x,1),size(G.combs,1),pointer(x),pointer(w),pointer(y),pointer(G.combs),pointer(G.combsl),pointer(G.combsu),pointer(G.hGji))
+	return y
 end
 
 
 function getW(G::Grid,A)
-	Aold = zeros(G.n)
-	dA = zeros(G.n)
-	w = zeros(G.n)
+	Aold 	= zeros(G.n)
+	dA 		= zeros(G.n)
+	w 		= zeros(G.n)
 	ccall((libwget, libsparse),
 		Void,
 		(Ptr{Float64},Int32,Int32,Ptr{Float64},Ptr{Float64},Ptr{Float64},Int32,Ptr{Float64},Ptr{Float64},Ptr{Float64}),
@@ -239,12 +278,25 @@ function getW(G::Grid,A)
 	return w
 end
 
+function getWinvC(G::Grid)
+	Aold 	= zeros(G.n,G.n)
+	dA 		= zeros(G.n,G.n)
+	w 		= zeros(G.n,G.n)
+	A 		= eye(G.n,G.n)
+	grid 	= deepcopy(G.grid)
+	ccall((libwgetinv, libsparse),
+		Void,
+		(Ptr{Float64},Int32,Int32,Ptr{Float64},Ptr{Float64},Ptr{Float64},Int32,Ptr{Float64},Ptr{Float64},Ptr{Float64}),
+		pointer(grid),G.n,G.d,pointer(G.lvl_s),pointer(G.lvl_l),pointer(A),G.q,pointer(Aold),pointer(dA),pointer(w))
+	return sparse(w)
+end
+
 function getWinv(G::Grid)
-	drange=collect(1:G.d)
-	qA= eye(G.n)
-	qAold = zeros(G.n,G.n)
-	qw= zeros(G.n,G.n)
-	qtemp = zeros(G.n)
+	drange 	= collect(1:G.d)
+	qA		= eye(G.n)
+	qAold 	= zeros(G.n,G.n)
+	qw		= zeros(G.n,G.n)
+	qtemp 	= zeros(G.n)
 
 	for i = 1:G.lvl_l[1]-1
 		@simd for j = 1:G.n
@@ -293,26 +345,12 @@ function getWinv(G::Grid)
    return sparse(qw)
 end
 
-function getWinvC(G::Grid)
-	Aold = zeros(G.n,G.n)
-	dA = zeros(G.n,G.n)
-	w = zeros(G.n,G.n)
-	A = eye(G.n,G.n)
-	grid = deepcopy(G.grid)
-	ccall((libwgetinv, libsparse),
-		Void,
-		(Ptr{Float64},Int32,Int32,Ptr{Float64},Ptr{Float64},Ptr{Float64},Int32,Ptr{Float64},Ptr{Float64},Ptr{Float64}),
-		pointer(grid),G.n,G.d,pointer(G.lvl_s),pointer(G.lvl_l),pointer(A),G.q,pointer(Aold),pointer(dA),pointer(w))
-	return sparse(w)
-end
-
 function getQ(xi1::Array{Float64},G::Grid)
-    xi = nXtoU(xi1,G.bounds)
-    xi[xi.>1]=1.0
-    xi[xi.<0]=0.0
-    nx = size(xi,1)
+    xi 		= nXtoU(xi1,G.bounds)
+	xi 		= clamp(xi,0.0,1.0)
+    nx 		= size(xi,1)
 
-    lvl_l = [1;G.lvl_l]
+    lvl_l 	= [1;G.lvl_l]
 
     Q = spzeros(nx,G.n)
     drange=collect(1:G.d)
@@ -330,8 +368,6 @@ function getQ(xi1::Array{Float64},G::Grid)
     end
    return Q
 end
-
-
 
 
 function grow!(G::Grid,ids::Vector{Int},bounds::Vector{Int})
@@ -412,11 +448,11 @@ function shrink!(G::Grid,id::Vector{Int})
     return nothing
 end
 
-function interpsafe(xi::Array{Float64},G::Grid,A::Vector{Float64})
+function interpjl(xi::Array{Float64},G::Grid,A::Vector{Float64})
     w = getW(G,A)
     nx = size(xi,1)
     y = zeros(nx)+w[1]
-    Base.Threads.@threads all for i = 1:nx
+    for i = 1:nx
         for ii = 2:G.n
             temp2 = 1.0
             for d = 1:G.d
@@ -427,4 +463,31 @@ function interpsafe(xi::Array{Float64},G::Grid,A::Vector{Float64})
         end
     end
     y
+end
+
+function getWjl(G::Grid,A::Vector{Float64})
+    Aold = zeros(G.n)
+    w = zeros(G.n)
+
+    w[1] = A[1]
+    for i = 1:G.n
+        Aold[i] =A[1]
+    end
+
+    for q = 1:G.q
+        for i=G.lvl_l[q]:G.lvl_l[q+1]-1
+            w[i] = A[i]-Aold[i]
+        end
+        for i = G.lvl_l[q+1]:G.n
+            for ii=G.lvl_l[q]:G.lvl_l[q+1]-1
+                temp2=1.0
+                for d=1:G.d
+                    temp2*=basis_func(G.grid[i,d],G.grid[ii,d],G.lvl_s[ii,d])
+                    temp2==0 && break
+                end
+				Aold[i] += temp2*w[ii]
+            end
+        end
+    end
+    w
 end
