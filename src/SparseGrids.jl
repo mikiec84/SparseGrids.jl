@@ -1,46 +1,33 @@
+__precompile__()
 module SparseGrids
+const GridSpecs = [(:CCGrid,:LinearBF,    :cc_bf_l, :cc_M, :cc_dM, :cc_itoj, :cc_dg)
+			       (:CCGrid,:QuadraticBF, :cc_bf_q, :cc_M, :cc_dM, :cc_itoj, :cc_dg)
+			       (:MaxGrid,:LinearBF,   :m_bf_l,  :m_M,  :m_dM,  :m_itoj,  :m_dg)
+			       (:MaxGrid,:QuadraticBF,:m_bf_q,  :m_M,  :m_dM,  :m_itoj,  :m_dg)]
 
-import Base.show
-export CurtisClenshaw,
-	   NoBoundary,
-	   Maximum,
-	   FullLinear,
-	   FullQuad,
-	   RadialSqrtCC,
-	   interp,
-	   getW,
-	   getWinv,
-	   getQ,
-	   grow!,
-	   shrink!
+using Combinatorics
+include("utils.jl")
+include("univariategrids.jl")
+include("grids.jl")
+include("jlfuncs.jl")
+include("cfuncs.jl")
+include("api.jl")
+include("adapt.jl")
 
-include("curtisclenshaw.jl")
-include("noboundary.jl")
-include("maximum.jl")
-include("fulllinear.jl")
-include("fullquad.jl")
-include("radialsqrtcc.jl")
+precompile(NGrid,(UnivariateGrid,Vector{Int}))
+precompile(interp,(Array{Float64},NGrid,Vector{Float64}))
 
-getWinvC(G::CurtisClenshaw.Grid) = CurtisClenshaw.getWinvC(G)
-getQ(xi::Array{Float64,2},G::CurtisClenshaw.Grid,) = CurtisClenshaw.getQ(xi,G)
-
-# getWinvC(G::NoBoundary.Grid) = NoBoundary.getWinvC(G)
-# getQ(xi::Array{Float64,2},G::NoBoundary.Grid) = NoBoundary.getQ(xi,G)
-# getWinvC(G::Maximum.Grid) = Maximum.getWinvC(G)
-# getQ(xi::Array{Float64,2},G::Maximum.Grid) = Maximum.getQ(xi,G)
-
-for g in (CurtisClenshaw,)#(CurtisClenshaw,Maximum,NoBoundary)
-	@eval interp(xi::Array{Float64,2},G::$g.Grid,A::Array{Float64,1}) 	= $g.interp(xi,G,A)
-	@eval getW(G::$g.Grid,A::Array{Float64}) 							= $g.getW(G,A)
-	@eval getWinv(G::$g.Grid) 											= $g.getWinv(G)
-	@eval grow!(G::$g.Grid,id,bounds::Vector{Int}=15*ones(Int,G.d))		= $g.grow!(G,id,bounds)
-	@eval shrink!(G::$g.Grid,id::Vector{Int}) 							= $g.shrink!(G,id)
-	@eval show(io::IO,G::$g.Grid) 										= println(io,typeof(G)," {",G.d,",",G.q,"}[",G.n,"]")
-end
-
-interp(xi::Array{Float64,2},G::FullLinear.Grid,A::Array{Float64,1}) 	= FullLinear.interp(xi,G,A)
-interp(xi::Array{Float64,2},G::FullQuad.Grid,A::Array{Float64,1}) 	= FullQuad.interp(xi,G,A)
-interp(xi::Array{Float64,2},G::RadialSqrtCC.Grid,A::Array{Float64,1}) 	= RadialSqrtCC.interp(xi,G,A)
-
-
+export BasisFunction,
+	   LinearBF,
+       QuadraticBF,
+	   UnivariateGrid,
+	   CCGrid,
+	   MaxGrid,
+	   CC,
+	   Max,
+       NGrid,
+       getW,
+       interp,
+	   shrink!,
+	   grow!
 end

@@ -4,7 +4,6 @@
 #include <map>
 using namespace std;
 
-
-#include "linear.cpp"
-#include "noboundary.cpp"
-#include "maximum.cpp"
+#include "griddefs.cpp"
+#include "getw.cpp"
+#include "interp.cpp"
