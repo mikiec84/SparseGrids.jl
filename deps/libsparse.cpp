@@ -1,9 +1,10 @@
 #include <cmath>
 #include <omp.h>
 #include <iostream>
-#include <map>
 using namespace std;
 
 #include "griddefs.cpp"
-#include "getw.cpp"
-#include "interp.cpp"
+#include "cc_l.cpp"
+#include "cc_q.cpp"
+#include "m_l.cpp"
+#include "m_q.cpp"

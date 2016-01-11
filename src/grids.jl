@@ -5,6 +5,7 @@ type MaxGrid <:GridType end
 abstract BasisFunction
 type LinearBF  <: BasisFunction end
 type QuadraticBF <: BasisFunction end
+type GaussianRadialBF <: BasisFunction end
 
 type UnivariateGrid{T<:GridType}
     M::Function
@@ -34,23 +35,22 @@ const CC = UnivariateGrid{CCGrid}(cc_M,cc_iM,cc_dM,cc_g,cc_dg,cc_itoj)
 const Max = UnivariateGrid{MaxGrid}(m_M,m_iM,m_dM,m_g,m_dg,m_itoj)
 
 
-function Base.kron(ug::UnivariateGrid,L::Vector{Int})
-    D = length(L)
-    gs = map(ug.dg,L)
-    lgs = Int[length(g) for g in gs]
-    G = zeros(prod(lgs),D)
+function Base.kron(X::Vector{Vector{Float64}})
+    D = length(X)
+    lxs = Int[length(x) for x in X]
+    G = zeros(prod(lxs),D)
     s=1
     for d=1:D
-        snext = s*lgs[d]
-        for j = 1:prod(lgs)
-            G[j,d] = gs[d][div(rem(j-1, snext), s)+1]
+        snext = s*lxs[d]
+        for j = 1:prod(lxs)
+            G[j,d] = X[d][div(rem(j-1, snext), s)+1]
         end
         s = snext
     end
     return G
 end
 
-Base.kron(ug::UnivariateGrid,L::Int) = kron(ug,[L])
+Base.kron(x::Vector{Float64}) = x
 
 function TensorGrid(gd::UnivariateGrid,L::Vector{Int})
     G = ndgrid(Vector{Float64}[gd.g(i) for i in L]...)
@@ -59,12 +59,13 @@ end
 
 function SmolyakGrid(ug::UnivariateGrid,L::Vector{Int},mL::UnitRange{Int}=0:maximum(L))
     D = length(L)
+    g = Vector{Float64}[ug.dg(l) for l = 1:maximum(L)+D-1]
     G = Array(Array{Float64},0)
     index = Array(Array{Int},0)
     for l = mL
         for covering in comb(D,D+l)
             if all(covering.≤L+1)
-                push!(G,kron(ug,covering))
+                push!(G,kron(g[covering]))
                 push!(index,repmat(covering',size(G[end],1)))
             end
         end
@@ -102,20 +103,27 @@ end
 
 function NGrid{T<:GridType,BT<:BasisFunction}(ug::UnivariateGrid{T},L::Vector{Int},bounds::Array{Float64} = [0,1]*ones(1,length(L));B::Type{BT}=LinearBF)
     grid,ind = SmolyakGrid(ug,L)
+    hashG=zeros(Int,size(grid,1))
+    for i ∈ 1:size(grid,1)
+        for d = 1:size(grid,2)
+            hashG[i] += ug.itoj(Int(ind[i,d]),clamp(round(Int16,grid[i,d]*(ug.dM(Int(ind[i,d])))+1/2),1,ug.dM(Int(ind[i,d]))),Int(maximum(ind)))
+            hashG[i] *= 17
+        end
+    end
 	coverings = map(UInt16,unique(ind,1))
 	coveringsloc = (Int32[findfirst(all(coverings[i:i,:].==ind,2)) for i = 1:size(coverings,1)],Int32[findlast(all(coverings[i:i,:].==ind,2)) for i = 1:size(coverings,1)])
+    for i = 1:length(coveringsloc[1])
+        id = coveringsloc[1][i]:coveringsloc[2][i]
+        id1 = id[sortperm(hashG[id])]
+        grid[id,:] = grid[id1,:]
+        ind[id,:] = ind[id1,:]
+        hashG[id] = hashG[id1]
+    end
     lev = level(ind)
 	lev_loc = level_loc(lev)
 	lev_M = map(i->Int16(ug.M(Int(i))),ind)::Array{Int16,2}
 	active = !(lev.<maximum(L))
 	nid = nextid(T,ind)
-	Gji = zeros(Int,size(grid))
-	for d = 1:size(grid,2)
-		for i ∈ 1:size(grid,1)
-		   Gji[i,d] = ug.itoj(Int(ind[i,d]),clamp(round(Int16,grid[i,d]*(ug.dM(Int(ind[i,d])))+1/2),1,ug.dM(Int(ind[i,d]))),Int(maximum(ind)))
-		end
-	end
-	hashG = vcat(Int[hsh(Gji[i,:]) for i = 1:size(grid,1)]...)::Vector{Int}
     return  NGrid{T,B}(L,bounds,lev,ind,grid,lev_M,active,nid,hashG,coverings,coveringsloc,lev_loc)
 end
 

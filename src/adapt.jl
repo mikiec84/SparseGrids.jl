@@ -13,11 +13,6 @@ function shrink!{T<:GridType,BT}(G::NGrid{T,BT},id::BitArray{1})
 end
 
 
-import SparseGrids: comb,GridType,CCGrid,MaxGrid,CC,Max,level,level_loc,nextid,hsh,add!
-G = NGrid(CC,[2,2])
-id = 6
-gtype{T<:GridType,BT}(G::NGrid{T,BT}) = (T,BT)
-T,BT = gtype(G)
 
 
 function grow!{T<:GridType,BT<:BasisFunction}(G::NGrid{T,BT},id::Int,bounds::Vector{Int}=12*ones(Int,length(G.L)))
@@ -71,7 +66,7 @@ function add!{T<:GridType,BT<:BasisFunction}(G::NGrid{T,BT},X::Array{Float64,2},
     id = sortperm(G.level)
     # t1 = sortrows([G.level G.index G.grid])
     id = sortperm(nextid(T,G.index))
-    
+
     G.level = G.level[id]
     G.index = G.index[id,:]
     G.grid = G.grid[id,:]

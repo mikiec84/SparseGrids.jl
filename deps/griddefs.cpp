@@ -70,7 +70,7 @@ inline double dxi_cc(long i, long j)
         return (j*2.0-1.0)/(M_cc(i)-1);
 }
 
-int indexshift_cc(long i, long j, long q)
+inline int indexshift_cc(long i, long j, long q)
 {
     if (i==1)
         return (M_cc(q)-1)/2+1;

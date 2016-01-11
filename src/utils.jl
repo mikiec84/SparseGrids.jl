@@ -59,66 +59,93 @@ function hsh(x::Array{Int,2})
 end
 
 
-function swap!(x::Vector{Int},i::Int,j::Int)
-	ta 	= x[i]
-	x[i]=x[j]
-	x[j]=ta
-	return nothing
-end
+# function swap!(x::Vector{Int},i::Int,j::Int)
+# 	ta 	= x[i]
+# 	x[i]=x[j]
+# 	x[j]=ta
+# 	return nothing
+# end
+#
+# function next_permute!(seq::Vector{Int})
+# 	n = length(seq)
+# 	j = n-1
+# 	while seq[j]>=seq[j+1]
+# 		j-=1
+# 		if j==0
+# 			return true
+# 		end
+# 	end
+# 	l = n
+# 	while seq[j]>=seq[l]
+# 		l-=1
+# 	end
+# 	swap!(seq,j,l)
+#
+# 	seq[j+1:n]=reverse(seq[j+1:n])
+# 	return false
+# end
+#
+# function get_perms(seq::Vector{Int})
+# 	a = sort(seq)
+# 	out = Array(Vector{Int},1)
+# 	out[1] = [a;]
+# 	if length(seq)==1
+# 		return out
+# 	end
+# 	done = false
+# 	while !done
+# 		done=next_permute!(a)
+# 		push!(out,[a;])
+# 	end
+# 	if out[end]==out[end-1]
+# 		out = out[1:end-1]
+# 	end
+# 	return out::Vector{Vector{Int}}
+# end
+#
+# function comb(D::Int,Q::Int)
+# 	if D ==1
+# 		return [Q]
+# 	end
+# 	Pq = Combinatorics.integer_partitions(Q)
+# 	out = Array(Vector{Int},0)
+#
+# 	for p in Pq
+# 		if length(p)==D
+# 			pPq=get_perms(p)
+# 			for j = 1:length(pPq)
+# 				push!(out,pPq[j])
+# 			end
+# 		end
+# 	end
+#
+# 	return out
+# end
 
-function next_permute!(seq::Vector{Int})
-	n = length(seq)
-	j = n-1
-	while seq[j]>=seq[j+1]
-		j-=1
-		if j==0
-			return true
-		end
-	end
-	l = n
-	while seq[j]>=seq[l]
-		l-=1
-	end
-	swap!(seq,j,l)
+function comb(D::Int, Q::Int)
+	D==Q ? (return Vector{Int}[ones(Int,D)]) : nothing
+	L = Q - D + 1
+	out = Array(Vector{Int},binomial(Q-1, D-1))
+	tL1 = ones(Int, D)
+	tL2 = L*ones(Int, D)
+	p = 1
+	cnt = 0
 
-	seq[j+1:n]=reverse(seq[j+1:n])
-	return false
-end
-
-function get_perms(seq::Vector{Int})
-	a = sort(seq)
-	out = Array(Vector{Int},1)
-	out[1] = [a;]
-	if length(seq)==1
-		return out
-	end
-	done = false
-	while !done
-		done=next_permute!(a)
-		push!(out,[a;])
-	end
-	if out[end]==out[end-1]
-		out = out[1:end-1]
-	end
-	return out::Vector{Vector{Int}}
-end
-
-function comb(D::Int,Q::Int)
-	if D ==1
-		return [Q]
-	end
-	Pq = Combinatorics.integer_partitions(Q)
-	out = Array(Vector{Int},0)
-
-	for p in Pq
-		if length(p)==D
-			pPq=get_perms(p)
-			for j = 1:length(pPq)
-				push!(out,pPq[j])
+	while tL1[D] < L
+		tL1[p] += 1
+		if tL1[p] > tL2[p]
+			tL1[p] = 1
+			p += 1
+		else
+			for i = 1:p-1
+				tL2[i] = tL2[p] - tL1[p] + 1
 			end
+			p = 1
+			tL1[1] = tL2[1]
+			cnt += 1
+			out[cnt] = copy(tL1)
 		end
 	end
-
 	return out
 end
 
