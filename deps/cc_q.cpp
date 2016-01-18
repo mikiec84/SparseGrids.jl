@@ -27,7 +27,6 @@ void w_cc_q(double *grid, int nG, int D, int Q, short *lvl_s, int *lvl_l, double
             }
             dA[i] = temp;
         }
-
         for (i=0;i<nG;i++)
             Aold[i] += dA[i];
     }
@@ -91,11 +90,13 @@ void interp_cc_q(int D, int Q, int nG, int nx,
                 if (temp2==0.0)
                     break;
             }
-            y[i] += temp2*w[ii-1];
             if (temp2==0.0)
                 ii+=1;
             else
+            {
+                y[i] += temp2*w[ii-1];
                 ii=nextid[ii-1];
+            }
         }
     }
 }
@@ -122,12 +123,15 @@ void interp_cc_q_arr(int D, int Q, int nG, int nx, int nA,
                 if (temp2==0.0)
                     break;
             }
-            for (iii=0;iii<nA;iii++)
-                y[i+iii*nx] += temp2*w[ii-1+iii*nG];
+
             if (temp2==0.0)
                 ii+=1;
             else
+            {
+                for (iii=0;iii<nA;iii++)
+                    y[i+iii*nx] += temp2*w[ii-1+iii*nG];
                 ii=nextid[ii-1];
+            }
         }
     }
 }

@@ -197,10 +197,7 @@ for i = 1:length(GridSpecs)
 	end))
 end
 
-
-
-
-function interp{T<:GridType}(x1::Array{Float64},G::NGrid{T,GaussianRadialBF},A::Array{Float64})
+function jl_interp{T<:GridType}(x1::Array{Float64},G::NGrid{T,GaussianRadialBF},A::Array{Float64})
 	x = nXtoU(x1,G.bounds)
 	Gm = eye(length(G))
     for i = 2:length(G)

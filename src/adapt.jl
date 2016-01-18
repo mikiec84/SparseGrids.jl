@@ -1,5 +1,6 @@
 function shrink!{T<:GridType,BT}(G::NGrid{T,BT},id::BitArray{1})
     G.grid= G.grid[id,:]
+    G.weights= G.weights[id,:]
     G.index= G.index[id,:]
     G.level= G.level[id]
     G.level_M= G.level_M[id,:]
@@ -26,7 +27,7 @@ function grow!{T<:GridType,BT<:BasisFunction}(G::NGrid{T,BT},id::Int,bounds::Vec
         n += (x[d]==0.0 || x[d] == 1.0) ? -1 : 0
     end
 
-    X,ind = SmolyakGrid(ug,bounds,G.level[id]+1:G.level[id]+1)
+    X,ind,w = SmolyakGrid(ug,bounds,G.level[id]+1:G.level[id]+1)
 
     id1 = BitArray(size(X,1))
     for i = 1:size(X,1)
@@ -55,7 +56,7 @@ function add!{T<:GridType,BT<:BasisFunction}(G::NGrid{T,BT},X::Array{Float64,2},
     Gji = zeros(Int,size(X))
     for d = 1:size(X,2)
 		for i ∈ 1:size(X,1)
-		   Gji[i,d] = ug.itoj(Int(ind[i,d]),clamp(round(Int16,X[i,d]*(ug.dM(Int(ind[i,d])))+1/2),1,ug.dM(Int(ind[i,d]))),Int(maximum(ind)))
+		   Gji[i,d] = ug.itoi(Int(ind[i,d]),clamp(round(Int16,X[i,d]*(ug.dM(Int(ind[i,d])))+1/2),1,ug.dM(Int(ind[i,d]))),Int(maximum(ind)))
 		end
 	end
 	hashG = vcat(Int[hsh(Gji[i,:]) for i = 1:size(X,1)]...)::Vector{Int}

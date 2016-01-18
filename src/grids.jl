@@ -1,20 +1,8 @@
-abstract GridType
-type CCGrid <:GridType end
-type MaxGrid <:GridType end
-
 abstract BasisFunction
 type LinearBF  <: BasisFunction end
 type QuadraticBF <: BasisFunction end
 type GaussianRadialBF <: BasisFunction end
 
-type UnivariateGrid{T<:GridType}
-    M::Function
-    iM::Function
-    dM::Function
-    g::Function
-    dg::Function
-	itoj::Function
-end
 
 type NGrid{T,B}
     L::Vector{Int}
@@ -29,10 +17,11 @@ type NGrid{T,B}
 	coverings::Array{Int16,2}
 	coveringsloc::Tuple{Vector{Int32},Vector{Int32}}
 	level_loc::Vector{Int32}
+    weights::Vector{Float64}
 end
 
-const CC = UnivariateGrid{CCGrid}(cc_M,cc_iM,cc_dM,cc_g,cc_dg,cc_itoj)
-const Max = UnivariateGrid{MaxGrid}(m_M,m_iM,m_dM,m_g,m_dg,m_itoj)
+
+
 
 
 function Base.kron(X::Vector{Vector{Float64}})
@@ -57,23 +46,53 @@ function TensorGrid(gd::UnivariateGrid,L::Vector{Int})
     G = hcat([vec(g) for g in G]...)
 end
 
+function SmolyakSize(ug::UnivariateGrid,L::Vector{Int},mL::UnitRange{Int}=0:maximum(L))
+    D = length(L)
+    m = Int[ug.dM(l) for l = 1:maximum(L)+D]
+    S = 0
+    for l = mL
+        for covering in comb(D,D+l)
+            if all(covering.≤L+1)
+                s=m[covering[1]]
+                for i = 2:length(covering)
+                    s*=m[covering[i]]
+                end
+                S+=s
+            end
+        end
+    end
+    return S
+end
+
 function SmolyakGrid(ug::UnivariateGrid,L::Vector{Int},mL::UnitRange{Int}=0:maximum(L))
     D = length(L)
-    g = Vector{Float64}[ug.dg(l) for l = 1:maximum(L)+D-1]
+    g = Vector{Float64}[ug.g(l) for l = 1:maximum(L)+D]
+    dw = Vector{Float64}[cc_dsimpsonsw(l) for l = 1:maximum(L)+D]
     G = Array(Array{Float64},0)
+    W = Array(Array{Float64},0)
     index = Array(Array{Int},0)
     for l = mL
         for covering in comb(D,D+l)
             if all(covering.≤L+1)
                 push!(G,kron(g[covering]))
+                push!(W, vec(prod(kron(dw[covering]),2)))
                 push!(index,repmat(covering',size(G[end],1)))
             end
         end
     end
     G = vcat(G...)::Array{Float64,2}
+    W = vcat(W...)
     index = vcat(index...)::Array{Int,2}
-    index = map(Int16,index)
-    return G::Array{Float64,2},index::Array{Int16,2}
+
+    uG = unique(G,1)
+    uW = zeros(size(uG,1))
+    uindex = zeros(Int16,size(uG))
+    for i = 1:size(uG,1)
+        ids = vec(all(G.==uG[i,:]',2))
+        uW[i]=sum(W[ids])
+        uindex[i,:]=index[findfirst(ids),:]
+    end
+    return uG,uindex,uW
 end
 
 level(index::Array{Int16,2}) = map(Int16,vec(sum(index,2)-size(index,2)))::Vector{Int16}
@@ -89,6 +108,8 @@ function nextid(::Type{CCGrid},ind::Array{Int16})
     return nextid
 end
 
+SparseGrids.nextid(::Type{CC2Grid},ind::Array{Int16}) = SparseGrids.nextid(CCGrid,ind)
+
 function nextid(::Type{MaxGrid},ind::Array{Int16})
 	C = unique(ind,1)
 	Cl = Vector{Int}[(1:size(ind,1))[vec(all(ind.==C[i,:]',2))] for i = 1:size(C,1)]
@@ -102,11 +123,11 @@ function nextid(::Type{MaxGrid},ind::Array{Int16})
 end
 
 function NGrid{T<:GridType,BT<:BasisFunction}(ug::UnivariateGrid{T},L::Vector{Int},bounds::Array{Float64} = [0,1]*ones(1,length(L));B::Type{BT}=LinearBF)
-    grid,ind = SmolyakGrid(ug,L)
+    grid,ind,weights = SmolyakGrid(ug,L)
     hashG=zeros(Int,size(grid,1))
     for i ∈ 1:size(grid,1)
         for d = 1:size(grid,2)
-            hashG[i] += ug.itoj(Int(ind[i,d]),clamp(round(Int16,grid[i,d]*(ug.dM(Int(ind[i,d])))+1/2),1,ug.dM(Int(ind[i,d]))),Int(maximum(ind)))
+            hashG[i] += ug.itoi(Int(ind[i,d]),clamp(round(Int16,grid[i,d]*(ug.dM(Int(ind[i,d])))+1/2),1,ug.dM(Int(ind[i,d]))),Int(maximum(ind)))
             hashG[i] *= 17
         end
     end
@@ -118,13 +139,14 @@ function NGrid{T<:GridType,BT<:BasisFunction}(ug::UnivariateGrid{T},L::Vector{In
         grid[id,:] = grid[id1,:]
         ind[id,:] = ind[id1,:]
         hashG[id] = hashG[id1]
+        weights[id] = weights[id1]
     end
     lev = level(ind)
 	lev_loc = level_loc(lev)
 	lev_M = map(i->Int16(ug.M(Int(i))),ind)::Array{Int16,2}
 	active = !(lev.<maximum(L))
 	nid = nextid(T,ind)
-    return  NGrid{T,B}(L,bounds,lev,ind,grid,lev_M,active,nid,hashG,coverings,coveringsloc,lev_loc)
+    return  NGrid{T,B}(L,bounds,lev,ind,grid,lev_M,active,nid,hashG,coverings,coveringsloc,lev_loc,weights)
 end
 
 Base.show(io::IO,G::NGrid) = println(typeof(G),"{$(length(G.L))-D,$(size(G.grid,1))n}")

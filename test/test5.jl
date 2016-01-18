@@ -17,7 +17,7 @@ function interpbig1(xi::Array{Float64},G::NGrid,A::Vector{Float64})
            for l = 1:mL+1
                j = clamp(round(Int,x[i,d]*(cc_dM(l))+1/2),1,cc_dM(l))
                B[l,d] = cc_bf_l(x[i,d],cc_dg(l,j),Int16(cc_M(l)))
-               J[l,d]  = cc_itoj(l,j,mL+1)
+               J[l,d]  = cc_itoi(l,j,mL+1)
            end
        end
 
