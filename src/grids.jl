@@ -13,16 +13,12 @@ type NGrid{T,B}
     level_M::Array{Int16,2}
     active::BitArray{1}
     nextid::Vector{Int32}
-    hashG::Vector{Int}
 	coverings::Array{Int16,2}
+    coverings_dM::Array{Int16,2}
 	coveringsloc::Tuple{Vector{Int32},Vector{Int32}}
 	level_loc::Vector{Int32}
     weights::Vector{Float64}
 end
-
-
-
-
 
 function Base.kron(X::Vector{Vector{Float64}})
     D = length(X)
@@ -64,7 +60,7 @@ function SmolyakSize(ug::UnivariateGrid,L::Vector{Int},mL::UnitRange{Int}=0:maxi
     return S
 end
 
-function SmolyakGrid(ug::UnivariateGrid,L::Vector{Int},mL::UnitRange{Int}=0:maximum(L))
+function SmolyakGrid(ug::UnivariateGrid,L::Vector{Int},R,mL::UnitRange{Int}=0:maximum(L))
     D = length(L)
     g = Vector{Float64}[ug.g(l) for l = 1:maximum(L)+D]
     dw = Vector{Float64}[cc_dsimpsonsw(l) for l = 1:maximum(L)+D]
@@ -75,7 +71,9 @@ function SmolyakGrid(ug::UnivariateGrid,L::Vector{Int},mL::UnitRange{Int}=0:maxi
         for covering in comb(D,D+l)
             if all(covering.≤L+1)
                 push!(G,kron(g[covering]))
-                push!(W, vec(prod(kron(dw[covering]),2)))
+                # push!(W, vec(prod(kron(dw[covering]),2)))
+                tw = dw[covering]
+                push!(W, vec(prod(kron(Vector{Float64}[tw[i]*R[i] for i = 1:D]),2)))
                 push!(index,repmat(covering',size(G[end],1)))
             end
         end
@@ -123,30 +121,17 @@ function nextid(::Type{MaxGrid},ind::Array{Int16})
 end
 
 function NGrid{T<:GridType,BT<:BasisFunction}(ug::UnivariateGrid{T},L::Vector{Int},bounds::Array{Float64} = [0,1]*ones(1,length(L));B::Type{BT}=LinearBF)
-    grid,ind,weights = SmolyakGrid(ug,L)
-    hashG=zeros(Int,size(grid,1))
-    for i ∈ 1:size(grid,1)
-        for d = 1:size(grid,2)
-            hashG[i] += ug.itoi(Int(ind[i,d]),clamp(round(Int16,grid[i,d]*(ug.dM(Int(ind[i,d])))+1/2),1,ug.dM(Int(ind[i,d]))),Int(maximum(ind)))
-            hashG[i] *= 17
-        end
-    end
+    R = vec(diff(bounds,1))
+    grid,ind,weights = SmolyakGrid(ug,L,R)
 	coverings = map(UInt16,unique(ind,1))
+    c_dM = map(x->ug.dM(Int(x)),coverings)
 	coveringsloc = (Int32[findfirst(all(coverings[i:i,:].==ind,2)) for i = 1:size(coverings,1)],Int32[findlast(all(coverings[i:i,:].==ind,2)) for i = 1:size(coverings,1)])
-    for i = 1:length(coveringsloc[1])
-        id = coveringsloc[1][i]:coveringsloc[2][i]
-        id1 = id[sortperm(hashG[id])]
-        grid[id,:] = grid[id1,:]
-        ind[id,:] = ind[id1,:]
-        hashG[id] = hashG[id1]
-        weights[id] = weights[id1]
-    end
     lev = level(ind)
 	lev_loc = level_loc(lev)
 	lev_M = map(i->Int16(ug.M(Int(i))),ind)::Array{Int16,2}
 	active = !(lev.<maximum(L))
 	nid = nextid(T,ind)
-    return  NGrid{T,B}(L,bounds,lev,ind,grid,lev_M,active,nid,hashG,coverings,coveringsloc,lev_loc,weights)
+    return  NGrid{T,B}(L,bounds,lev,ind,grid,lev_M,active,nid,coverings,c_dM,coveringsloc,lev_loc,weights)
 end
 
 Base.show(io::IO,G::NGrid) = println(typeof(G),"{$(length(G.L))-D,$(size(G.grid,1))n}")

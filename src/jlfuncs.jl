@@ -17,7 +17,7 @@ for i = 1:length(GridSpecs)
                     end
                     Aold[i] += temp2*w[ii]
                 end
-            end
+                end
         end
         return w
     end))

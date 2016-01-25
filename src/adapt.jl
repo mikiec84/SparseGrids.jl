@@ -53,26 +53,16 @@ function add!{T<:GridType,BT<:BasisFunction}(G::NGrid{T,BT},X::Array{Float64,2},
     G.level = level(G.index)
     G.level_M = [G.level_M;map(i->Int16(ug.M(Int(i))),ind)]
     G.L = vec(maximum(G.index,1)-1)
-    Gji = zeros(Int,size(X))
-    for d = 1:size(X,2)
-		for i ∈ 1:size(X,1)
-		   Gji[i,d] = ug.itoi(Int(ind[i,d]),clamp(round(Int16,X[i,d]*(ug.dM(Int(ind[i,d])))+1/2),1,ug.dM(Int(ind[i,d]))),Int(maximum(ind)))
-		end
-	end
-	hashG = vcat(Int[hsh(Gji[i,:]) for i = 1:size(X,1)]...)::Vector{Int}
 
-    G.hashG = [G.hashG;hashG]
     G.active = [G.active;!BitArray(size(X,1))]
 
     id = sortperm(G.level)
-    # t1 = sortrows([G.level G.index G.grid])
     id = sortperm(nextid(T,G.index))
 
     G.level = G.level[id]
     G.index = G.index[id,:]
     G.grid = G.grid[id,:]
     G.level_M = G.level_M[id,:]
-    G.hashG = G.hashG[id]
     G.nextid= nextid(T,G.index)
 
 

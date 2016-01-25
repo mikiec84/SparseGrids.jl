@@ -70,14 +70,14 @@ function c_interpbig(xi::Array{Float64},G::NGrid{CCGrid,LinearBF},A::Vector{Floa
     x 		= nXtoU(xi,G.bounds)
     y 		= zeros(size(xi,1))
     w 		= getW(G,A)
-    ccall((cc_interp_l_big,"libsparse.so"),
+    ccall((:_Z15interp_cc_l_biglllllPdS_S_PsS0_PiS1_,"libsparse.so"),
         Void,
         (Int32,Int32,Int32,Int32,Int32,
         Ptr{Float64},Ptr{Float64},Ptr{Float64},
-        Ptr{Int16},Ptr{Int32},Ptr{Int32},Ptr{Int}),
+        Ptr{Int16},Ptr{Int16},Ptr{Int32},Ptr{Int32}),
         length(G.L),maximum(G.L),size(G.grid,1),size(x,1),size(G.coverings,1),
         pointer(x),pointer(w),pointer(y),
-        pointer(G.coverings),pointer(G.coveringsloc[1]),pointer(G.coveringsloc[2]),pointer(G.hashG))
+        pointer(G.coverings),pointer(G.coverings_dM),pointer(G.coveringsloc[1]),pointer(G.coveringsloc[2]))
     return y
 end
 
@@ -85,14 +85,15 @@ function c_interpbig(xi::Array{Float64},G::NGrid{CCGrid,LinearBF},A::Array{Float
     x 		= nXtoU(xi,G.bounds)
     y 		= zeros(size(x,1),size(A,2))
     w 		= getW(G,A)
-    ccall((:_Z19interp_cc_l_big_arrllllllPdS_S_PsPiS1_Pl,"libsparse.so"),
+
+    ccall((:_Z19interp_cc_l_big_arrllllllPdS_S_PsS0_PiS1_,"libsparse.so"),
         Void,
         (Int32,Int32,Int32,Int32,Int32,Int32,
         Ptr{Float64},Ptr{Float64},Ptr{Float64},
-        Ptr{Int16},Ptr{Int32},Ptr{Int32},Ptr{Int}),
+        Ptr{Int16},Ptr{Int16},Ptr{Int32},Ptr{Int32}),
         length(G.L),maximum(G.L),size(G.grid,1),size(x,1),size(G.coverings,1),size(A,2),
         pointer(x),pointer(w),pointer(y),
-        pointer(G.coverings),pointer(G.coveringsloc[1]),pointer(G.coveringsloc[2]),pointer(G.hashG))
+        pointer(G.coverings),pointer(G.coverings_dM),pointer(G.coveringsloc[1]),pointer(G.coveringsloc[2]))
     return y
 end
 
@@ -156,13 +157,14 @@ function c_interpbig(xi::Array{Float64},G::NGrid{CCGrid,QuadraticBF},A::Vector{F
     x 		= nXtoU(xi,G.bounds)
     y 		= zeros(size(xi,1))
     w 		= getW(G,A)
-    ccall((cc_interp_q_big,"libsparse.so"),
+    ccall((:_Z15interp_cc_q_biglllllPdS_S_PsS0_PiS1_,"libsparse.so"),
         Void,
         (Int32,Int32,Int32,Int32,Int32,
         Ptr{Float64},Ptr{Float64},Ptr{Float64},
-        Ptr{Int16},Ptr{Int32},Ptr{Int32},Ptr{Int}),        length(G.L),maximum(G.L),size(G.grid,1),size(x,1),size(G.coverings,1),
+        Ptr{Int16},Ptr{Int16},Ptr{Int32},Ptr{Int32}),
+        length(G.L),maximum(G.L),size(G.grid,1),size(x,1),size(G.coverings,1),
         pointer(x),pointer(w),pointer(y),
-        pointer(G.coverings),pointer(G.coveringsloc[1]),pointer(G.coveringsloc[2]),pointer(G.hashG))
+        pointer(G.coverings),pointer(G.coverings_dM),pointer(G.coveringsloc[1]),pointer(G.coveringsloc[2]))
     return y
 end
 
@@ -170,14 +172,14 @@ function c_interpbig(xi::Array{Float64},G::NGrid{CCGrid,QuadraticBF},A::Array{Fl
     x 		= nXtoU(xi,G.bounds)
     y 		= zeros(size(x,1),size(A,2))
     w 		= getW(G,A)
-    ccall((:_Z19interp_cc_q_big_arrllllllPdS_S_PsPiS1_Pl,"libsparse.so"),
+    ccall((:_Z19interp_cc_q_big_arrllllllPdS_S_PsS0_PiS1_,"libsparse.so"),
         Void,
         (Int32,Int32,Int32,Int32,Int32,Int32,
         Ptr{Float64},Ptr{Float64},Ptr{Float64},
-        Ptr{Int16},Ptr{Int32},Ptr{Int32},Ptr{Int}),
+        Ptr{Int16},Ptr{Int16},Ptr{Int32},Ptr{Int32}),
         length(G.L),maximum(G.L),size(G.grid,1),size(x,1),size(G.coverings,1),size(A,2),
         pointer(x),pointer(w),pointer(y),
-        pointer(G.coverings),pointer(G.coveringsloc[1]),pointer(G.coveringsloc[2]),pointer(G.hashG))
+        pointer(G.coverings),pointer(G.coverings_dM),pointer(G.coveringsloc[1]),pointer(G.coveringsloc[2]))
     return y
 end
 
