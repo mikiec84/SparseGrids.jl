@@ -1,12 +1,12 @@
 function shrink!{T<:GridType,BT}(G::NGrid{T,BT},id::BitArray{1})
     G.grid= G.grid[id,:]
-    G.weights= G.weights[id,:]
+    G.weights= G.weights[id]
     G.index= G.index[id,:]
     G.level= G.level[id]
     G.level_M= G.level_M[id,:]
     G.active= G.active[id]
-    G.hashG= G.hashG[id]
     G.coverings = map(UInt16,unique(G.index,1))
+	G.coverings_dM = map(x->CC.dM(Int(x)),G.coverings)
 	G.coveringsloc = (Int32[findfirst(all(G.coverings[i:i,:].==G.index,2)) for i = 1:size(G.coverings,1)],Int32[findlast(all(G.coverings[i:i,:].==G.index,2)) for i = 1:size(G.coverings,1)])
     G.level_loc = level_loc(G.level)
     G.nextid = nextid(T,G.index)

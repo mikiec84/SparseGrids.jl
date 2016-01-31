@@ -1,9 +1,8 @@
-getW{T<:GridType,BT<:BasisFunction}(G::NGrid{T,BT},A::Vector{Float64}) = c_getW(G,A)
-getW{T<:GridType,BT<:BasisFunction}(G::NGrid{T,BT},A::Array{Float64,2}) = c_getW(G,A)
+getW(G::NGrid,A::Array{Float64}) = length(G.L)>2 ? getW1(G,A) : c_getW(G,A)
 
 
-interp{T<:GridType,BT<:BasisFunction}(xi::Array{Float64},G::NGrid{T,BT},A::Vector{Float64}) = length(G)<250 ? c_interp(xi,G,A) : c_interpbig(xi,G,A)
-interp{T<:GridType,BT<:BasisFunction}(xi::Array{Float64},G::NGrid{T,BT},A::Array{Float64,2}) = length(G)<250 ? c_interp(xi,G,A) : c_interpbig(xi,G,A)
+# interp{T<:GridType,BT<:BasisFunction}(xi::Array{Float64},G::NGrid{T,BT},A::Vector{Float64}) = length(G)>250 && length(G.L)>1? c_interpbig(xi,G,A) : c_interp(xi,G,A)
+interp{T<:GridType,BT<:BasisFunction}(xi::Array{Float64},G::NGrid{T,BT},A::Array{Float64}) = length(G)>250 && length(G.L)>1 ? c_interpbig(xi,G,A) : c_interp(xi,G,A)
 
 
 getW(G::NGrid{CC2Grid,LinearBF},A::Vector{Float64}) = jl_getW(G,A)

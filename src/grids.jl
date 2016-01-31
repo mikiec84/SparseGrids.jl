@@ -8,16 +8,20 @@ type NGrid{T,B}
     L::Vector{Int}
     bounds::Array{Float64,2}
     level::Vector{Int16}
+    level_M::Array{Int16,2}
+	level_loc::Vector{Int32}
     index::Array{Int16,2}
     grid::Array{Float64,2}
-    level_M::Array{Int16,2}
-    active::BitArray{1}
     nextid::Vector{Int32}
+    nextc::Vector{Int32}
 	coverings::Array{Int16,2}
     coverings_dM::Array{Int16,2}
 	coveringsloc::Tuple{Vector{Int32},Vector{Int32}}
-	level_loc::Vector{Int32}
+    coveringsid::Vector{Int32}
+    IDs::Vector{Vector{Int}}
+    Bs::Vector{Vector{Float64}}
     weights::Vector{Float64}
+    active::BitArray{1}
 end
 
 function Base.kron(X::Vector{Vector{Float64}})
@@ -71,7 +75,6 @@ function SmolyakGrid(ug::UnivariateGrid,L::Vector{Int},R,mL::UnitRange{Int}=0:ma
         for covering in comb(D,D+l)
             if all(covering.≤L+1)
                 push!(G,kron(g[covering]))
-                # push!(W, vec(prod(kron(dw[covering]),2)))
                 tw = dw[covering]
                 push!(W, vec(prod(kron(Vector{Float64}[tw[i]*R[i] for i = 1:D]),2)))
                 push!(index,repmat(covering',size(G[end],1)))
@@ -108,22 +111,14 @@ end
 
 SparseGrids.nextid(::Type{CC2Grid},ind::Array{Int16}) = SparseGrids.nextid(CCGrid,ind)
 
-function nextid(::Type{MaxGrid},ind::Array{Int16})
-	C = unique(ind,1)
-	Cl = Vector{Int}[(1:size(ind,1))[vec(all(ind.==C[i,:]',2))] for i = 1:size(C,1)]
-	itoCi = [findfirst([in(i,c) for c in Cl]) for i = 1:size(ind,1)]
-    nextid = zeros(Int32,size(ind,1))
-    for i = 1:size(ind,1)
-        nextid[i] = in(1,ind[i,:]) ? i+1 : findfirst(itoCi.>itoCi[i])
-    end
-	nextid[nextid.==0]=(size(ind,1)+1)
-	return nextid
-end
 
 function NGrid{T<:GridType,BT<:BasisFunction}(ug::UnivariateGrid{T},L::Vector{Int},bounds::Array{Float64} = [0,1]*ones(1,length(L));B::Type{BT}=LinearBF)
     R = vec(diff(bounds,1))
     grid,ind,weights = SmolyakGrid(ug,L,R)
 	coverings = map(UInt16,unique(ind,1))
+    nextc = Int[findfirst((sum(coverings,2)-length(L))[i]+1.==(sum(coverings,2)-length(L))) for i = 1:size(coverings,1)]
+    nextc[nextc.==0] = size(coverings,1)+10
+    cid     = Int32[findfirst(all(ind[i:i,:].== coverings,2)) for i = 1:size(grid,1)]
     c_dM = map(x->ug.dM(Int(x)),coverings)
 	coveringsloc = (Int32[findfirst(all(coverings[i:i,:].==ind,2)) for i = 1:size(coverings,1)],Int32[findlast(all(coverings[i:i,:].==ind,2)) for i = 1:size(coverings,1)])
     lev = level(ind)
@@ -131,7 +126,16 @@ function NGrid{T<:GridType,BT<:BasisFunction}(ug::UnivariateGrid{T},L::Vector{In
 	lev_M = map(i->Int16(ug.M(Int(i))),ind)::Array{Int16,2}
 	active = !(lev.<maximum(L))
 	nid = nextid(T,ind)
-    return  NGrid{T,B}(L,bounds,lev,ind,grid,lev_M,active,nid,coverings,c_dM,coveringsloc,lev_loc,weights)
+    G = NGrid{T,B}(L,bounds,
+                        lev,lev_M,lev_loc,ind,
+                        grid,
+                        nid,nextc,
+                        coverings,c_dM,coveringsloc,cid,
+                        Vector{Int}[Int[] for i = 1:size(grid,1)],
+                        Vector{Float64}[Float64[] for i = 1:size(grid,1)],
+                        weights,active)
+    buildW(G)
+    return G
 end
 
 Base.show(io::IO,G::NGrid) = println(typeof(G),"{$(length(G.L))-D,$(size(G.grid,1))n}")

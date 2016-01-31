@@ -1,108 +1,87 @@
-function interpsafe(xi::Array{Float64},G::SparseGrids.CurtisClenshaw.Grid,A::Vector{Float64})
-    w = getW(G,A)
-    nx = size(xi,1)
-    y = zeros(nx)
-	Q = []
+function jl_interpbig1(xi::Array{Float64},G::NGrid,A::Vector{Float64})
+    w 		= getW(G,A)
+    x 		= SparseGrids.nXtoU(xi,G.bounds)
+    y 		= zeros(size(x,1))
+    nc 		= size(G.coverings,1)
+    mL      = maximum(G.L)
+    D       = length(G.L)
 
-    for i = 1:nx
-        for ii = 1:G.n
-            temp2 = 1.0
-            for d = 1:G.d
-                temp2 *= CurtisClenshaw.basis_func(xi[i,d],G.grid[ii,d],G.lvl_s[ii,d])
-				temp2==0.0 ? break : nothing
+    for i = 1:size(x,1)
+        J 		= ones(Int,mL+1,D)
+        B 		= zeros(mL+1,D)
+        id  	= zeros(Int,D)
+        for d = 1:D
+            for l = 1:mL+1
+                j 	= clamp(round(Int,x[i,d]*(SparseGrids.cc_dM(l))+1/2),1,SparseGrids.cc_dM(l))
+                B[l,d] 	= SparseGrids.cc_bf_l(x[i,d],SparseGrids.cc_dg(l,j),Int16(SparseGrids.cc_M(l)))
+                J[l,d]  = j
             end
-			i==nx && temp2>0.0 ? push!(Q,[ii;temp2]) : nothing
-            y[i]+= temp2*w[ii]
+        end
+
+        for ii = 1:nc
+            b  = B[G.coverings[ii,D],D]*B[G.coverings[ii,1],1]
+            id1 = J[G.coverings[ii,D],D]-1
+            for d = D-1:-1:2
+                b*=B[G.coverings[ii,d],d]
+                id1 *= G.coverings_dM[ii,d]
+                id1 += (J[G.coverings[ii,d],d]-1)
+            end
+            id1=(J[G.coverings[ii,1],1]-1)+G.coverings_dM[ii,1]*id1+1+G.coveringsloc[1][ii]-1
+            y[i]+=b*w[id1]
         end
     end
-    y,Q
+    y
 end
 
-function interpunsafe(xi::Array{Float64},G::SparseGrids.CurtisClenshaw.Grid,A::Vector{Float64})
-    w = getW(G,A)
-    nx = size(xi,1)
-    y = zeros(nx)
-	Q = []
+function jl_interpbig2(xi::Array{Float64},G::NGrid,A::Vector{Float64})
+    w 		= getW(G,A)
+    x 		= SparseGrids.nXtoU(xi,G.bounds)
+    y 		= zeros(size(x,1))
+    nc 		= size(G.coverings,1)
+    mL      = maximum(G.L)
+    D       = length(G.L)
 
-    for i = 1:nx
-		ii=1
-        while ii<G.n
-            temp2 = 1.0
-            for d = 1:G.d
-                temp2 *= CurtisClenshaw.basis_func(xi[i,d],G.grid[ii,d],G.lvl_s[ii,d])
-				temp2==0.0 ? break : nothing
+    for i = 1:size(x,1)
+        J 		= ones(Int,mL+1,D)
+        B 		= zeros(mL+1,D)
+        id  	= zeros(Int,D)
+        for d = 1:D
+            for l = 1:mL+1
+                j 	= clamp(round(Int,x[i,d]*(SparseGrids.cc_dM(l))+1/2),1,SparseGrids.cc_dM(l))
+                B[l,d] 	= SparseGrids.cc_bf_l(x[i,d],SparseGrids.cc_dg(l,j),Int16(SparseGrids.cc_M(l)))
+                J[l,d]  = j-1
             end
-			temp2>0 ? push!(Q,[ii;temp2]) : nothing
-            y[i]+= temp2*w[ii]
-            println(ii," ",temp2==0 ? ii+1 : G.nextid[ii])
-			temp2 == 0.0 ? ii+=1 : ii=G.nextid[ii]
+        end
+
+        for ii = 1:nc
+            b  = B[G.coverings[ii,D],D]*B[G.coverings[ii,1],1]
+            id1 = J[G.coverings[ii,D],D]
+            for d = D-1:-1:2
+                b*=B[G.coverings[ii,d],d]
+                id1 *= G.coverings_dM[ii,d]
+                id1 += J[G.coverings[ii,d],d]
+            end
+            id1=J[G.coverings[ii,1],1]+G.coverings_dM[ii,1]*id1+1+G.coveringsloc[1][ii]-1
+            y[i]+=b*w[id1]
         end
     end
-    y,Q
-end
-import SparseGrids.CurtisClenshaw:nodes,Index,getnextid
-
-id = 8
-bounds = [10,10]
-
-
-
-
-# Gb =CurtisClenshaw.Grid(2,2)
-G =CurtisClenshaw.Grid(2,2)
-for i = 1:10
-    A = rand(G.n)
-    id = reverse(sortperm(abs(getW(G,A))-1e100*!G.active))
-    CurtisClenshaw.grow!(G,id[1],[10,10])
+    y
 end
 
-
-A = rand(G.n)
-nothing
-
+G = NGrid(CC,[5,5,5,2,2,2])
+A = rand(length(G))
 
 
-xi = rand(1,2)
-w = getW(G,A)
+#
+# b=@benchmark SparseGrids.jl_interpbig(G.grid,G,A);
+# b1=@benchmark jl_interpbig1(G.grid,G,A);
+# b2=@benchmark jl_interpbig2(G.grid,G,A);
+b = [(tic();SparseGrids.jl_interpbig(G.grid,G,A);toq()) for i = 1:1000]
+b1 = [(tic();jl_interpbig1(G.grid,G,A);toq()) for i = 1:1000]
+b2 = [(tic();jl_interpbig2(G.grid,G,A);toq()) for i = 1:1000]
 
-Q = zeros(G.n)
-Q2 = zeros(G.n)
-ids =Int[]
-
-y = 0
-cnt =0
-for ii = 1:G.n
-    cnt +=1
-    temp2 = 1.0
-    for d = 1:G.d
-        temp2 *= CurtisClenshaw.basis_func(xi[1,d],G.grid[ii,d],G.lvl_s[ii,d])
-        temp2==0.0 ? break : nothing
-    end
-    temp2>0 ? push!(ids,ii) : nothing
-    # println(ii,"->",temp2)
-    y+= temp2*w[ii]
-    Q[ii] = y
-end
-
-
-y2 = 0
-cnt2=0
-ii=1
-while ii<=G.n
-    cnt2+=1
-    temp2 = 1.0
-    for d = 1:G.d
-        temp2 *= CurtisClenshaw.basis_func(xi[1,d],G.grid[ii,d],G.lvl_s[ii,d])
-        temp2==0.0 ? break : nothing
-    end
-    # println(ii,"->",temp2)
-    y2+= temp2*w[ii]
-    Q2[ii] = y2
-    temp2 == 0.0 ? ii+=1 : ii=G.nextid[ii]
-    cnt2>G.n ? break : nothsing
-end
-
-
-[Q Q2][ids,:]
-@assert y==y2
-println(cnt,"  ",cnt2)
+using HypothesisTests
+# ApproximateTwoSampleKSTest(b1.samples.elapsed_times,b2.samples.elapsed_times)
+ApproximateTwoSampleKSTest(b,b1)
+ApproximateTwoSampleKSTest(b1,b2)
+ApproximateTwoSampleKSTest(b,b2)

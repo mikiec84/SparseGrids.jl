@@ -6,7 +6,6 @@ type UnivariateGrid{T<:GridType}
     dM::Function
     g::Function
     dg::Function
-	itoi::Function
 end
 
 
@@ -19,15 +18,7 @@ cc_g(i::Int,j::Int)     = (i==1) ?  0.5  : (j-1)/(cc_M(i)-1.0)
 cc_g(i::Int)            = Float64[cc_g(i,j) for j = 1:cc_M(i)]
 cc_dg(i::Int,j::Int)    = i==2 ? [0.0,1.0][j] : cc_g(i,2j)
 cc_dg(i::Int)           = Float64[cc_dg(i,j) for j = 1:cc_dM(i)]
-function cc_itoi(i1,j,i2)
-    if i1 ==1
-        return div(cc_M(i2)-1,2)+1
-    elseif i1==2
-        return j==1 ? 1 : cc_M(i2)
-    else
-        return div((cc_M(i2)-1)*(j*2-1),cc_M(i1)-1)+1
-    end
-end
+
 function cc_bf_l(x::Float64,xij::Float64,mi::Int16)
     if (mi==1)
         return 1.0
@@ -69,32 +60,9 @@ function cc_dsimpsonsw(i::Int)
     end
 end
 
-const CC = UnivariateGrid{CCGrid}(cc_M,cc_iM,cc_dM,cc_g,cc_dg,cc_itoi)
+const CC = UnivariateGrid{CCGrid}(cc_M,cc_iM,cc_dM,cc_g,cc_dg)
 
 
-
-type MaxGrid <:GridType end
-m_M(i::Int) =  2^i+1
-m_iM(i::Int) = Int(log2(i-1))
-m_dM(i::Int) = i==1 ? 3 : 2^(i-1)
-m_g(i::Int,j::Int)    = (j-1)/(m_M(i)-1)
-m_g(i::Int)           = Float64[m_g(i,j) for j = 1:m_M(i)]
-m_dg(i::Int,j::Int) = i==1 ? m_g(i)[j] : m_g(i,2j)
-m_dg(i::Int)           = Float64[m_dg(i,j) for j = 1:m_dM(i)]
-m_itoi(i,j,q) =	div((j-1)*(m_M(q)-1),m_M(i)-1)+1
-function m_bf_l(x::Float64, xij::Float64, mi::Int16)
-    if (abs(x-xij)<1/(mi-1))
-        return 1.0-(mi-1)*abs(x-xij)
-    else
-        return 0.0
-    end
-end
-function m_bf_q(x::Float64, xij::Float64, mi::Int16)
-	dx = 1.0-((mi-1.0)*(x-xij))^2
-	return dx>0.0 ? dx : 0.0
-end
-
-const Max = UnivariateGrid{MaxGrid}(m_M,m_iM,m_dM,m_g,m_dg,m_itoi)
 
 
 
@@ -144,15 +112,6 @@ function cc2_dg(i::Int,j::Int)
 end
 cc2_dg(i::Int)           = Float64[cc2_dg(i,j) for j = 1:cc2_dM(i)]
 
-function cc2_itoi(i,j,q)
-    if i ==1
-        return div(cc2_M(q)-1,2)+1
-    elseif i==2
-        return j==1 ? 1 : cc2_M(q)
-    else
-        return div((cc2_M(q)-1)*(j*2-1),cc2_M(i)-1)+1
-    end
-end
 
 
-const CC2 = UnivariateGrid{CC2Grid}(cc2_M,cc2_iM,cc2_dM,cc2_g,cc2_dg,cc2_itoi)
+const CC2 = UnivariateGrid{CC2Grid}(cc2_M,cc2_iM,cc2_dM,cc2_g,cc2_dg)
