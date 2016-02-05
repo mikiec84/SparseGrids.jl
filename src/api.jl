@@ -10,3 +10,7 @@ interp(xi::Array{Float64},G::NGrid{CC2Grid,LinearBF},A::Array{Float64,1}) = jl_i
 interp(xi::Array{Float64},G::NGrid{CC2Grid,LinearBF},A::Array{Float64,2}) = jl_interp(xi,G,A)
 
 interp{T<:GridType}(xi::Array{Float64},G::NGrid{T,GaussianRadialBF},A::Array{Float64}) = jl_interp(xi,G,A)
+
+
+
+(G::NGrid)(A::Array{Float64},x::Array{Float64,2}) = interp(x,G,A)
