@@ -46,7 +46,7 @@ function TensorGrid(gd::UnivariateGrid,L::Vector{Int})
     G = hcat([vec(g) for g in G]...)
 end
 
-function SmolyakSize(ug::UnivariateGrid,L::Vector{Int},mL::UnitRange{Int}=0:maximum(L))
+function SmolyakSize(L::Vector{Int},mL::UnitRange{Int}=0:maximum(L),ug::UnivariateGrid=CC)
     D = length(L)
     m = Int[ug.dM(l) for l = 1:maximum(L)+D]
     S = 0
@@ -112,7 +112,7 @@ end
 SparseGrids.nextid(::Type{CC2Grid},ind::Array{Int16}) = SparseGrids.nextid(CCGrid,ind)
 
 
-function NGrid{T<:GridType,BT<:BasisFunction}(ug::UnivariateGrid{T},L::Vector{Int},bounds::Array{Float64} = [0,1]*ones(1,length(L));B::Type{BT}=LinearBF)
+function NGrid{T<:GridType,BT<:BasisFunction}(L::Vector{Int},bounds::Array{Float64} = [0,1]*ones(1,length(L));B::Type{BT}=LinearBF,ug::UnivariateGrid{T}=CC)
     R = vec(diff(bounds,1))
     grid,ind,weights = SmolyakGrid(ug,L,R)
 	coverings = map(UInt16,unique(ind,1))

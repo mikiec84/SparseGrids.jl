@@ -129,8 +129,6 @@ void interp_cc_l(int D, int Q, int nG, int nx,
     #pragma omp parallel for private(ii,temp2,d)
     for (i=0;i<nx;i++)
     {
-        // y[i] += w[0];
-        // ii=2;
         ii=1;
         while (ii<=nG)
         {
@@ -141,7 +139,6 @@ void interp_cc_l(int D, int Q, int nG, int nx,
                 if (temp2==0.0)
                     break;
             }
-            // y[i] += temp2*w[ii-1];
             if (temp2==0.0)
                 ii+=1;
             else

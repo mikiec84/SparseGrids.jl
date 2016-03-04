@@ -16,6 +16,8 @@ include("adapt.jl")
 precompile(NGrid,(UnivariateGrid,Vector{Int}))
 precompile(interp,(Array{Float64},NGrid,Vector{Float64}))
 
+
+
 export BasisFunction,
 	   LinearBF,
        QuadraticBF,

@@ -81,28 +81,28 @@ for i = 1:length(GridSpecs)
         return
     end))
 
-    eval(:(function getW1(G::NGrid,A::Vector{Float64})
-        w = copy(A)
-        for i = 1:length(G)
-            for l ∈ 1:length(G.Bs[i])-1
-                w[i]+=  G.Bs[i][l]*w[G.IDs[i][l]]
-            end
-        end
-        return w
-    end))
-
-    eval(:(function getW1(G::NGrid,A::Array{Float64,2})
-        nA = size(A,2)
-        w = copy(A)
-        for i = 1:length(G)
-            for l ∈ 1:length(G.Bs[i])-1
-                for a = 1:nA
-                    w[i,a]+=  G.Bs[i][l]*w[G.IDs[i][l],a]
-                end
-            end
-        end
-        return w
-    end))
+    # eval(:(function getW1(G::NGrid,A::Vector{Float64})
+    #     w = copy(A)
+    #     for i = 1:length(G)
+    #         for l ∈ 1:length(G.Bs[i])-1
+    #             w[i]+=  G.Bs[i][l]*w[G.IDs[i][l]]
+    #         end
+    #     end
+    #     return w
+    # end))
+    #
+    # eval(:(function getW1(G::NGrid,A::Array{Float64,2})
+    #     nA = size(A,2)
+    #     w = copy(A)
+    #     for i = 1:length(G)
+    #         for l ∈ 1:length(G.Bs[i])-1
+    #             for a = 1:nA
+    #                 w[i,a]+=  G.Bs[i][l]*w[G.IDs[i][l],a]
+    #             end
+    #         end
+    #     end
+    #     return w
+    # end))
 
 
     eval(:(function jl_interpslow(xi::Array{Float64},G::NGrid{$(GridSpecs[i][1]),$(GridSpecs[i][2])},A::Vector{Float64})
@@ -262,4 +262,28 @@ function jl_interp{T<:GridType}(x1::Array{Float64},G::NGrid{T,GaussianRadialBF},
         end
     end
     return g*w
+end
+
+
+function getW1(G::NGrid,A::Vector{Float64})
+    w = copy(A)
+    for i = 1:length(G)
+        for l ∈ 1:length(G.Bs[i])-1
+            w[i]+=  G.Bs[i][l]*w[G.IDs[i][l]]
+        end
+    end
+    return w
+end
+
+function getW1(G::NGrid,A::Array{Float64,2})
+    nA = size(A,2)
+    w = copy(A)
+    for i = 1:length(G)
+        for l ∈ 1:length(G.Bs[i])-1
+            for a = 1:nA
+                w[i,a]+=  G.Bs[i][l]*w[G.IDs[i][l],a]
+            end
+        end
+    end
+    return w
 end

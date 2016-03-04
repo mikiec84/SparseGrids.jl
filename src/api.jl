@@ -13,4 +13,4 @@ interp{T<:GridType}(xi::Array{Float64},G::NGrid{T,GaussianRadialBF},A::Array{Flo
 
 
 
-(G::NGrid)(A::Array{Float64},x::Array{Float64,2}) = ilength(G)>250 && length(G.L)>1 ? c_interpbig(xi,G,A) : c_interp(xi,G,A)
+(G::NGrid)(A::Array{Float64},x::Array{Float64,2}) = length(G)>250 && length(G.L)>1 ? c_interpbig(x,G,A) : c_interp(x,G,A)
