@@ -1,8 +1,8 @@
-function c_interpbig_s(xi::Array{Float64},G::NGrid{CCGrid,LinearBF},A::Vector{Float64})
+function c_interpbig_s(xi::Array{Float64},G::NGrid{CCGrid,Linear},A::Vector{Float64})
     x 		= SparseGrids.nXtoU(xi,G.bounds)
     y 		= zeros(size(xi,1))
     w 		= getW(G,A)
-    ccall((:_Z17interp_cc_l_big_slllllPdS_S_PsPiS1_Pl,"libsparse.so"),
+    ccall((:_Z17interp_cc_l_big_slllllPdS_S_PsPiS1_Pl,lsparse),
         Void,
         (Int32,Int32,Int32,Int32,Int32,
         Ptr{Float64},Ptr{Float64},Ptr{Float64},
@@ -13,11 +13,11 @@ function c_interpbig_s(xi::Array{Float64},G::NGrid{CCGrid,LinearBF},A::Vector{Fl
     return y
 end
 
-function c_interpbig1_s(xi::Array{Float64},G::NGrid{CCGrid,LinearBF},A::Vector{Float64})
+function c_interpbig1_s(xi::Array{Float64},G::NGrid{CCGrid,Linear},A::Vector{Float64})
     x 		= SparseGrids.nXtoU(xi,G.bounds)
     y 		= zeros(size(xi,1))
     w 		= getW(G,A)
-    ccall((:_Z18interp_cc_l_big1_slllllPdS_S_PsS0_PiS1_Pl,"libsparse.so"),
+    ccall((:_Z18interp_cc_l_big1_slllllPdS_S_PsS0_PiS1_Pl,lsparse),
         Void,
         (Int32,Int32,Int32,Int32,Int32,
         Ptr{Float64},Ptr{Float64},Ptr{Float64},
@@ -28,11 +28,11 @@ function c_interpbig1_s(xi::Array{Float64},G::NGrid{CCGrid,LinearBF},A::Vector{F
     return y
 end
 
-function c_interpbig1_p(xi::Array{Float64},G::NGrid{CCGrid,LinearBF},A::Vector{Float64})
+function c_interpbig1_p(xi::Array{Float64},G::NGrid{CCGrid,Linear},A::Vector{Float64})
     x 		= SparseGrids.nXtoU(xi,G.bounds)
     y 		= zeros(size(xi,1))
     w 		= getW(G,A)
-    ccall((:_Z18interp_cc_l_big1_plllllPdS_S_PsS0_PiS1_Pl,"libsparse.so"),
+    ccall((:_Z18interp_cc_l_big1_plllllPdS_S_PsS0_PiS1_Pl,lsparse),
         Void,
         (Int32,Int32,Int32,Int32,Int32,
         Ptr{Float64},Ptr{Float64},Ptr{Float64},

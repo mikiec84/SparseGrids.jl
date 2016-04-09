@@ -1,33 +1,28 @@
 __precompile__()
 module SparseGrids
-const GridSpecs = [(:CCGrid,:LinearBF,    :cc_bf_l, :cc_M, :cc_dM, :cc_dg)
-			       (:CCGrid,:QuadraticBF, :cc_bf_q, :cc_M, :cc_dM, :cc_dg)
-				   (:CC2Grid,:LinearBF,    :cc_bf_l, :cc2_M, :cc2_dM, :cc2_dg)]
+const GridSpecs = [(:CCGrid,:Linear,    :cc_bf_l, :cc_M, :cc_dM, :cc_dg)
+			       (:CCGrid,:Quadratic, :cc_bf_q, :cc_M, :cc_dM, :cc_dg)]
 
-using Combinatorics
+using Combinatorics,Base.Threads
 include("utils.jl")
 include("univariategrids.jl")
 include("grids.jl")
 include("jlfuncs.jl")
 include("cfuncs.jl")
 include("api.jl")
-include("adapt.jl")
 
-precompile(NGrid,(UnivariateGrid,Vector{Int}))
-precompile(interp,(Array{Float64},NGrid,Vector{Float64}))
+precompile(NGrid,(Vector{Int},))
 
 
 
 export BasisFunction,
-	   LinearBF,
-       QuadraticBF,
+	   Linear,
+       Quadratic,
 	   UnivariateGrid,
 	   GridType,
 	   CCGrid,
-	   CC2Grid,
 	   MaxGrid,
 	   CC,
-	   CC2,
 	   Max,
        NGrid,
        getW,

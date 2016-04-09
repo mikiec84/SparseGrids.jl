@@ -1,25 +1,14 @@
-const cc_wget_l = :_Z6w_cc_lPdiiiPsPiS_S_S_S_
-const cc_interp_l = :_Z11interp_cc_liiiiPdPsS_S_S_Pi
-const cc_interp_l_big = :_Z15interp_cc_l_biglllllPdS_S_PsPiS1_Pl
-
-const cc_wget_q = :_Z6w_cc_qPdiiiPsPiS_S_S_S_
-const cc_interp_q = :_Z11interp_cc_qiiiiPdPsS_S_S_Pi
-const cc_interp_q_big = :_Z15interp_cc_q_biglllllPdS_S_PsPiS1_Pl
-
-const m_wget_l = :_Z5w_m_lPdiiiPsPiS_S_S_S_
-const m_interp_l = :_Z10interp_m_liiiiPdPsS_S_S_Pi
-const m_wget_q = :_Z5w_m_qPdiiiPsPiS_S_S_S_
-const m_interp_q = :_Z10interp_m_qiiiiPdPsS_S_S_Pi
+const lsparse = Pkg.dir("SparseGrids")*"/deps/libsparse.so"
 
 ###############################################################################
-#  CC   LinearBF
+#  CC   Linear
 ###############################################################################
 
-function c_getW(G::NGrid{CCGrid,LinearBF},A::Vector{Float64})
+function c_getW(G::NGrid{Linear},A::Vector{Float64})
     Aold 	= zeros(length(G))
     dA 		= zeros(length(G))
     w 		= zeros(length(G))
-    ccall((:_Z6w_cc_liiiPdS_PsPiS_S_S_,"libsparse.so"),
+    ccall((:_Z6w_cc_liiiPdS_PsPiS_S_S_,lsparse),
         Void,
         (Int32,Int32,Int32,
         Ptr{Float64},Ptr{Float64},Ptr{Int16},Ptr{Float64},
@@ -30,10 +19,10 @@ function c_getW(G::NGrid{CCGrid,LinearBF},A::Vector{Float64})
     return w
 end
 
-function c_getW(G::NGrid{CCGrid,LinearBF},A::Array{Float64,2})
+function c_getW(G::NGrid{Linear},A::Array{Float64,2})
     Aold 	= zeros(size(A))
     w 		= zeros(size(A))
-    ccall((:_Z10w_cc_l_arrPdiiiiPsPiS_S_S_,"libsparse.so"),
+    ccall((:_Z10w_cc_l_arrPdiiiiPsPiS_S_S_,lsparse),
         Void,
         (Ptr{Float64},Int32,Int32,Int32,Int32,
          Ptr{Int16},Ptr{Float64},Ptr{Float64},
@@ -43,34 +32,34 @@ function c_getW(G::NGrid{CCGrid,LinearBF},A::Array{Float64,2})
         pointer(Aold),pointer(w))
     return w
 end
-    
-function c_interp(xi::Array{Float64},G::NGrid{CCGrid,LinearBF},A::Vector{Float64})
+
+function c_interp(xi::Array{Float64},G::NGrid{Linear},A::Vector{Float64})
     x 		= nXtoU(xi,G.bounds)
     y 		= zeros(size(xi,1))
-    w 		= getW(G,A)
-    ccall((cc_interp_l,"libsparse.so"),
+    w 		= c_getW(G,A)
+    ccall((:_Z11interp_cc_liiiiPdPsS_S_S_Pi,lsparse),
         Void,
         (Int32,Int32,Int32,Int32,Ptr{Float64},Ptr{Int16},Ptr{Float64},Ptr{Float64},Ptr{Float64},Ptr{Float64}),
         length(G.L),maximum(G.L),size(G.grid,1),size(x,1),pointer(G.grid),pointer(G.level_M),pointer(w),pointer(x),pointer(y),pointer(G.nextid))
     return y
 end
 
-function c_interp(xi::Array{Float64},G::NGrid{CCGrid,LinearBF},A::Array{Float64,2})
+function c_interp(xi::Array{Float64},G::NGrid{Linear},A::Array{Float64,2})
     x 		= nXtoU(xi,G.bounds)
     y 		= zeros(size(x,1),size(A,2))
-    w 		= getW(G,A)
-    ccall((:_Z15interp_cc_l_arriiiiiPdPsS_S_S_Pi,"libsparse.so"),
+    w 		= c_getW(G,A)
+    ccall((:_Z15interp_cc_l_arriiiiiPdPsS_S_S_Pi,lsparse),
         Void,
         (Int32,Int32,Int32,Int32,Int32,Ptr{Float64},Ptr{Int16},Ptr{Float64},Ptr{Float64},Ptr{Float64},Ptr{Float64}),
         length(G.L),maximum(G.L),size(G.grid,1),size(x,1),size(A,2),pointer(G.grid),pointer(G.level_M),pointer(w),pointer(x),pointer(y),pointer(G.nextid))
     return y
 end
 
-function c_interpbig(xi::Array{Float64},G::NGrid{CCGrid,LinearBF},A::Vector{Float64})
-    x 		= nXtoU(xi,G.bounds)
+function c_interpbig(xi::Array{Float64},G::NGrid{Linear},A::Vector{Float64})
+    x 		= clamp!(nXtoU(xi,G.bounds),0.0,1.0)
     y 		= zeros(size(xi,1))
-    w 		= getW(G,A)
-    ccall((:_Z15interp_cc_l_biglllllPdS_S_PsS0_PiS1_,"libsparse.so"),
+    w 		= jl_getWbig(G,A)
+    ccall((:_Z15interp_cc_l_biglllllPdS_S_PsS0_PiS1_,lsparse),
         Void,
         (Int32,Int32,Int32,Int32,Int32,
         Ptr{Float64},Ptr{Float64},Ptr{Float64},
@@ -81,12 +70,12 @@ function c_interpbig(xi::Array{Float64},G::NGrid{CCGrid,LinearBF},A::Vector{Floa
     return y
 end
 
-function c_interpbig(xi::Array{Float64},G::NGrid{CCGrid,LinearBF},A::Array{Float64,2})
-    x 		= nXtoU(xi,G.bounds)
+function c_interpbig(xi::Array{Float64},G::NGrid{Linear},A::Array{Float64,2})
+    x 		= clamp!(nXtoU(xi,G.bounds),0.0,1.0)
     y 		= zeros(size(x,1),size(A,2))
-    w 		= getW(G,A)
+    w 		= jl_getWbig(G,A)
 
-    ccall((:_Z19interp_cc_l_big_arrllllllPdS_S_PsS0_PiS1_,"libsparse.so"),
+    ccall((:_Z19interp_cc_l_big_arrllllllPdS_S_PsS0_PiS1_,lsparse),
         Void,
         (Int32,Int32,Int32,Int32,Int32,Int32,
         Ptr{Float64},Ptr{Float64},Ptr{Float64},
@@ -98,15 +87,15 @@ function c_interpbig(xi::Array{Float64},G::NGrid{CCGrid,LinearBF},A::Array{Float
 end
 
 ###############################################################################
-#  CC   QuadraticBF
+#  CC   Quadratic
 ###############################################################################
 
 
-function c_getW(G::NGrid{CCGrid,QuadraticBF},A::Vector{Float64})
+function c_getW(G::NGrid{Quadratic},A::Vector{Float64})
     Aold 	= zeros(length(G))
     dA 		= zeros(length(G))
     w 		= zeros(length(G))
-    ccall((cc_wget_q,"libsparse.so"),
+    ccall((:_Z6w_cc_qPdiiiPsPiS_S_S_S_,lsparse),
         Void,
         (Ptr{Float64},Int32,Int32,Int32,
          Ptr{Int16},Ptr{Float64},Ptr{Float64},
@@ -117,10 +106,10 @@ function c_getW(G::NGrid{CCGrid,QuadraticBF},A::Vector{Float64})
     return w
 end
 
-function c_getW(G::NGrid{CCGrid,QuadraticBF},A::Array{Float64,2})
+function c_getW(G::NGrid{Quadratic},A::Array{Float64,2})
     Aold 	= zeros(size(A))
     w 		= zeros(size(A))
-    ccall((:_Z10w_cc_q_arrPdiiiiPsPiS_S_S_,"libsparse.so"),
+    ccall((:_Z10w_cc_q_arrPdiiiiPsPiS_S_S_,lsparse),
         Void,
         (Ptr{Float64},Int32,Int32,Int32,Int32,
          Ptr{Int16},Ptr{Float64},Ptr{Float64},
@@ -131,33 +120,33 @@ function c_getW(G::NGrid{CCGrid,QuadraticBF},A::Array{Float64,2})
     return w
 end
 
-function c_interp(xi::Array{Float64},G::NGrid{CCGrid,QuadraticBF},A::Vector{Float64})
+function c_interp(xi::Array{Float64},G::NGrid{Quadratic},A::Vector{Float64})
     x 		= nXtoU(xi,G.bounds)
     y 		= zeros(size(xi,1))
-    w 		= getW(G,A)
-    ccall((cc_interp_q,"libsparse.so"),
+    w 		= c_getW(G,A)
+    ccall((:_Z11interp_cc_qiiiiPdPsS_S_S_Pi,lsparse),
         Void,
         (Int32,Int32,Int32,Int32,Ptr{Float64},Ptr{Int16},Ptr{Float64},Ptr{Float64},Ptr{Float64},Ptr{Float64}),
         length(G.L),maximum(G.L),size(G.grid,1),size(x,1),pointer(G.grid),pointer(G.level_M),pointer(w),pointer(x),pointer(y),pointer(G.nextid))
     return y
 end
 
-function c_interp(xi::Array{Float64},G::NGrid{CCGrid,QuadraticBF},A::Array{Float64,2})
+function c_interp(xi::Array{Float64},G::NGrid{Quadratic},A::Array{Float64,2})
     x 		= nXtoU(xi,G.bounds)
     y 		= zeros(size(x,1),size(A,2))
-    w 		= getW(G,A)
-    ccall((:_Z15interp_cc_q_arriiiiiPdPsS_S_S_Pi,"libsparse.so"),
+    w 		= c_getW(G,A)
+    ccall((:_Z15interp_cc_q_arriiiiiPdPsS_S_S_Pi,lsparse),
         Void,
         (Int32,Int32,Int32,Int32,Int32,Ptr{Float64},Ptr{Int16},Ptr{Float64},Ptr{Float64},Ptr{Float64},Ptr{Float64}),
         length(G.L),maximum(G.L),size(G.grid,1),size(x,1),size(A,2),pointer(G.grid),pointer(G.level_M),pointer(w),pointer(x),pointer(y),pointer(G.nextid))
     return y
 end
 
-function c_interpbig(xi::Array{Float64},G::NGrid{CCGrid,QuadraticBF},A::Vector{Float64})
-    x 		= nXtoU(xi,G.bounds)
+function c_interpbig(xi::Array{Float64},G::NGrid{Quadratic},A::Vector{Float64})
+    x 		= clamp!(nXtoU(xi,G.bounds),0.0,1.0)
     y 		= zeros(size(xi,1))
-    w 		= getW(G,A)
-    ccall((:_Z15interp_cc_q_biglllllPdS_S_PsS0_PiS1_,"libsparse.so"),
+    w 		= jl_getWbig(G,A)
+    ccall((:_Z15interp_cc_q_biglllllPdS_S_PsS0_PiS1_,lsparse),
         Void,
         (Int32,Int32,Int32,Int32,Int32,
         Ptr{Float64},Ptr{Float64},Ptr{Float64},
@@ -168,11 +157,11 @@ function c_interpbig(xi::Array{Float64},G::NGrid{CCGrid,QuadraticBF},A::Vector{F
     return y
 end
 
-function c_interpbig(xi::Array{Float64},G::NGrid{CCGrid,QuadraticBF},A::Array{Float64,2})
-    x 		= nXtoU(xi,G.bounds)
+function c_interpbig(xi::Array{Float64},G::NGrid{Quadratic},A::Array{Float64,2})
+    x 		= clamp!(nXtoU(xi,G.bounds),0.0,1.0)
     y 		= zeros(size(x,1),size(A,2))
-    w 		= getW(G,A)
-    ccall((:_Z19interp_cc_q_big_arrllllllPdS_S_PsS0_PiS1_,"libsparse.so"),
+    w 		= jl_getWbig(G,A)
+    ccall((:_Z19interp_cc_q_big_arrllllllPdS_S_PsS0_PiS1_,lsparse),
         Void,
         (Int32,Int32,Int32,Int32,Int32,Int32,
         Ptr{Float64},Ptr{Float64},Ptr{Float64},

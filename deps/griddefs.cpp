@@ -49,10 +49,10 @@ inline int M_cc(long i)
 
 inline int dM_cc(long i)
 {
-    if (i==1)
-        return 1;
-    else if (i==2)
-        return 2;
+    if (i<3)
+        return pow(2,i-1);
+    // else if (i==2)
+    //     return 2;
     else
         return pow(2,i-2);
 }

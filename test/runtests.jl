@@ -1,23 +1,22 @@
-G = NGrid(CC,[8])
-A = rand(length(G),2)
-@assert maximum(abs(interp(G.grid,G,A[:,1])-A[:,1]))<1e-15
-@assert maximum(abs(interp(G.grid,G,A)-A))<1e-15
-G = NGrid(CC,[8],B=QuadraticBF)
-@assert maximum(abs(interp(G.grid,G,A[:,1])-A[:,1]))<1e-15
-@assert maximum(abs(interp(G.grid,G,A)-A))<1e-15
+using SparseGrids,Base.Test
+# Linear Basis Function
 
-for d = 2:4 
-    G = NGrid(CC,4*ones(Int,d))
-    A = rand(length(G),2)
-    @assert maximum(abs(SparseGrids.c_interp(G.grid,G,A[:,1])-A[:,1]))<1e-13
-    @assert maximum(abs(SparseGrids.c_interp(G.grid,G,A)-A))<1e-13
-    @assert maximum(abs(SparseGrids.c_interpbig(G.grid,G,A[:,1])-A[:,1]))<1e-13
-    @assert maximum(abs(SparseGrids.c_interpbig(G.grid,G,A)-A))<1e-13
 
-    G = NGrid(CC,4*ones(Int,d),B=QuadraticBF)
-    A = rand(length(G),2)
-    @assert maximum(abs(SparseGrids.c_interp(G.grid,G,A[:,1])-A[:,1]))<1e-14
-    @assert maximum(abs(SparseGrids.c_interp(G.grid,G,A)-A))<1e-14
-    @assert maximum(abs(SparseGrids.c_interpbig(G.grid,G,A[:,1])-A[:,1]))<1e-14
-    @assert maximum(abs(SparseGrids.c_interpbig(G.grid,G,A)-A))<1e-14
+println("1→2 Dimensions")
+
+for d ∈ 1:6, l ∈ 1:4, B ∈ [Linear,Quadratic]
+    G = NGrid(ones(Int,l)*d,B=B)
+    A = rand(length(G))
+    @test maximum(abs(G(A,G.grid)-A))<1e-14
+end
+
+
+d,l,B=4,4,Quadratic
+G = NGrid(ones(Int,d)*l,B=B)
+for i = 1:1000
+    x = rand(1000,d)
+    A = rand(length(G),d)
+    @assert all(SparseGrids.c_interp(G.grid,G,A)-A.<1e14) ||
+    @assert all(SparseGrids.c_interpbig(G.grid,G,A)-A.<1e14)
+    maximum(abs(SparseGrids.c_interp(x,G,A)-SparseGrids.c_interpbig(x,G,A)))<1e-14
 end

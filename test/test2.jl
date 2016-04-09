@@ -1,8 +1,8 @@
-function c_interpbigbase(xi::Array{Float64},G::NGrid{CCGrid,LinearBF},A::Vector{Float64})
+function c_interpbigbase(xi::Array{Float64},G::NGrid{CCGrid,Linear},A::Vector{Float64})
     x 		= SparseGrids.nXtoU(xi,G.bounds)
     y 		= zeros(size(xi,1))
     w 		= getW(G,A)
-    ccall((:_Z19interp_cc_l_bigbaselllllPdS_S_PsS0_PiS1_,"libsparse.so"),
+    ccall((:_Z19interp_cc_l_bigbaselllllPdS_S_PsS0_PiS1_,lsparse),
         Void,
         (Int32,Int32,Int32,Int32,Int32,
         Ptr{Float64},Ptr{Float64},Ptr{Float64},
@@ -13,11 +13,11 @@ function c_interpbigbase(xi::Array{Float64},G::NGrid{CCGrid,LinearBF},A::Vector{
     return y
 end
 
-function c_interpbigbase(xi::Array{Float64},G::NGrid{CCGrid,QuadraticBF},A::Vector{Float64})
+function c_interpbigbase(xi::Array{Float64},G::NGrid{CCGrid,Quadratic},A::Vector{Float64})
     x 		= SparseGrids.nXtoU(xi,G.bounds)
     y 		= zeros(size(xi,1))
     w 		= getW(G,A)
-    ccall((:_Z19interp_cc_q_bigbaselllllPdS_S_PsS0_PiS1_,"libsparse.so"),
+    ccall((:_Z19interp_cc_q_bigbaselllllPdS_S_PsS0_PiS1_,lsparse),
         Void,
         (Int32,Int32,Int32,Int32,Int32,
         Ptr{Float64},Ptr{Float64},Ptr{Float64},
@@ -28,11 +28,11 @@ function c_interpbigbase(xi::Array{Float64},G::NGrid{CCGrid,QuadraticBF},A::Vect
     return y
 end
 
-function c_interpbig2(xi::Array{Float64},G::NGrid{CCGrid,QuadraticBF},A::Vector{Float64})
+function c_interpbig2(xi::Array{Float64},G::NGrid{CCGrid,Quadratic},A::Vector{Float64})
     x 		= SparseGrids.nXtoU(xi,G.bounds)
     y 		= zeros(size(xi,1))
     w 		= getW(G,A)
-    ccall((:_Z16interp_cc_q_big2lllllPdS_S_PsS0_PiS1_,"libsparse.so"),
+    ccall((:_Z16interp_cc_q_big2lllllPdS_S_PsS0_PiS1_,lsparse),
         Void,
         (Int32,Int32,Int32,Int32,Int32,
         Ptr{Float64},Ptr{Float64},Ptr{Float64},
@@ -44,7 +44,7 @@ function c_interpbig2(xi::Array{Float64},G::NGrid{CCGrid,QuadraticBF},A::Vector{
 end
 
 G = NGrid(CC,[4,4,4,1,1])
-Gq = NGrid(CC,G.L,B=QuadraticBF)
+Gq = NGrid(CC,G.L,B=Quadratic)
 A = rand(length(G))
 
 
