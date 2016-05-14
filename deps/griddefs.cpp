@@ -51,8 +51,6 @@ inline int dM_cc(long i)
 {
     if (i<3)
         return pow(2,i-1);
-    // else if (i==2)
-    //     return 2;
     else
         return pow(2,i-2);
 }

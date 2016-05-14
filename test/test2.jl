@@ -1,94 +1,191 @@
-function c_interpbigbase(xi::Array{Float64},G::NGrid{CCGrid,Linear},A::Vector{Float64})
-    x 		= SparseGrids.nXtoU(xi,G.bounds)
-    y 		= zeros(size(xi,1))
-    w 		= getW(G,A)
-    ccall((:_Z19interp_cc_l_bigbaselllllPdS_S_PsS0_PiS1_,lsparse),
-        Void,
-        (Int32,Int32,Int32,Int32,Int32,
-        Ptr{Float64},Ptr{Float64},Ptr{Float64},
-        Ptr{Int16},Ptr{Int16},Ptr{Int32},Ptr{Int32}),
-        length(G.L),maximum(G.L),size(G.grid,1),size(x,1),size(G.coverings,1),
-        pointer(x),pointer(w),pointer(y),
-        pointer(G.coverings),pointer(G.coverings_dM),pointer(G.coveringsloc[1]),pointer(G.coveringsloc[2]))
-    return y
-end
-
-function c_interpbigbase(xi::Array{Float64},G::NGrid{CCGrid,Quadratic},A::Vector{Float64})
-    x 		= SparseGrids.nXtoU(xi,G.bounds)
-    y 		= zeros(size(xi,1))
-    w 		= getW(G,A)
-    ccall((:_Z19interp_cc_q_bigbaselllllPdS_S_PsS0_PiS1_,lsparse),
-        Void,
-        (Int32,Int32,Int32,Int32,Int32,
-        Ptr{Float64},Ptr{Float64},Ptr{Float64},
-        Ptr{Int16},Ptr{Int16},Ptr{Int32},Ptr{Int32}),
-        length(G.L),maximum(G.L),size(G.grid,1),size(x,1),size(G.coverings,1),
-        pointer(x),pointer(w),pointer(y),
-        pointer(G.coverings),pointer(G.coverings_dM),pointer(G.coveringsloc[1]),pointer(G.coveringsloc[2]))
-    return y
-end
-
-function c_interpbig2(xi::Array{Float64},G::NGrid{CCGrid,Quadratic},A::Vector{Float64})
-    x 		= SparseGrids.nXtoU(xi,G.bounds)
-    y 		= zeros(size(xi,1))
-    w 		= getW(G,A)
-    ccall((:_Z16interp_cc_q_big2lllllPdS_S_PsS0_PiS1_,lsparse),
-        Void,
-        (Int32,Int32,Int32,Int32,Int32,
-        Ptr{Float64},Ptr{Float64},Ptr{Float64},
-        Ptr{Int16},Ptr{Int16},Ptr{Int32},Ptr{Int32}),
-        length(G.L),maximum(G.L),size(G.grid,1),size(x,1),size(G.coverings,1),
-        pointer(x),pointer(w),pointer(y),
-        pointer(G.coverings),pointer(G.coverings_dM),pointer(G.coveringsloc[1]),pointer(G.coveringsloc[2]))
-    return y
-end
-
-G = NGrid(CC,[4,4,4,1,1])
-Gq = NGrid(CC,G.L,B=Quadratic)
-A = rand(length(G))
+import SparseGrids: getparents
 
 
-function runtest(G,A)
-    x = rand(5000,length(G.L))
-    b,b1,b2=0.0,0.0,0.0
-    for i = 1:1000
-        tic(); SparseGrids.c_interpbig(x,G,A); b1+=toq()
-        tic(); SparseGrids.c_interp(x,G,A); b+=toq()
+@inline cc_M{T}(i::T)           = (i==1) ? T(1) : T(2)^(i-T(1))+T(1)
+@inline function cc_bf_l(x::Float64,xij::Float64,mi)
+    if (mi==1)
+        return 1.0
     end
-    println(b/b1)
+    dx = (1.0-(mi-1.0)*abs(x-xij))
+    return (dx>0.0) ? dx : 0.0
 end
-runtest(Gq,A)
-
-
-
-@assert maximum(abs(c_interpbigbase(G.grid,G,A)-A))<1e-15
-@assert maximum(abs(c_interpbigbase(G.grid,Gq,A)-A))<1e-15
-@assert maximum(abs(c_interpbig2(G.grid,Gq,A)-A))<1e-15
-
-function runtest(G,A)
-    x = rand(5000,length(G.L))
-    b,b1,b2=0.0,0.0,0.0
-    for i = 1:1000
-        tic(); c_interpbigbase(x,G,A);   b+=toq()
-        tic(); SparseGrids.c_interpbig(x,G,A); b1+=toq()
-        tic(); c_interpbig2(x,G,A);   b2+=toq()
+@inline function cc_bf_q(x::Float64,xij::Float64,mi)
+    if (mi==1)
+        return 1.0
     end
-    println(b/b1,"  ",b/b2)
+    dx = 1.0-((mi-1.0)*(x-xij))^2
+    return (dx>0.0) ?  dx : 0.0
 end
-runtest(Gq,A)
+
+
+function ainterp{D,BF}(G::NGrid{D,BF},A,x)
+    bf = (BF==Linear ? cc_bf_l : cc_bf_q)
+    nG = length(G)
+    y = G(A,x)
+    w = getW(G,A)
+    for i = 1:length(y)
+        for j = (G.covers_loc[end]+prod(G.covers_dM[end,:])):nG
+            b = 1.0
+            for d = 1:D
+                b *= bf(x[i,d],G.grid[j,d],cc_M(level(G.grid[j,d])))
+                b==0 && break
+            end
+            b>0 && (y[i] += w[j]*b)
+        end
+    end
+    return y
+end
+
+
+G.covers_dM
+
+function interp1{D,BF}(G::NGrid{D,BF},A,x)
+    bf = (BF==Linear ? cc_bf_l : cc_bf_q)
+    nG = length(G)
+    w = getW(G,A)
+    y = zeros(size(x,1))
+    for i = 1:length(y)
+        for j = 1:nG
+            b = 1.0
+            for d = 1:D
+                b *= bf(x[i,d],G.grid[j,d],cc_M(level(G.grid[j,d])))
+                b==0 && break
+            end
+            b>0 && (y[i] += w[j]*b)
+        end
+    end
+    return y
+end
+
+function interp11{D,BF}(G::NGrid{D,BF},A,x)
+    bf = (BF==Linear ? cc_bf_l : cc_bf_q)
+    nG = length(G)
+    w = getW(G,A)
+    y = zeros(size(x,1))
+    pos = map(SparseGrids.position,G.grid)
+    mL      = 8
+    B         = zeros(mL+1,D)
+
+    for i = 1:length(y)
+        for d = 1:D
+            for l = 1:mL+1
+                j     = clamp(round(Int,x[i,d]*(cc_dM(l))+1/2),1,cc_dM(l))
+                B[l,d]     = bf(x[i,d],cc_dg(l,j),Int16(cc_M(l)))
+            end
+        end
+        for j = 1:nG
+            b = 1.0
+            for d = 1:D
+                b *= B[pos[j,d][2]]
+                b==0 && break
+            end
+            b>0 && (y[i] += w[j]*b)
+        end
+    end
+    return y
+end
 
 
 
+function interp2{D,BF}(G::NGrid{D,BF},A,x,baT)
+    bf = (BF==Linear ? cc_bf_l : cc_bf_q)
+    nG = length(G)
+    w = getW(G,A)
+    y = zeros(size(x,1))
+    id = BitArray(nG)
+    for i = 1:length(y)
+        for j = 1:nG
+            id[j] = true
+        end
+        j = 1
+        while j<=nG
+            if id[j]
+                b = 1.0
+                for d = 1:D
+                    b *= bf(x[i,d],G.grid[j,d],cc_M(level(G.grid[j,d])))
+                    b==0 && break
+                end
+                if b>0
+                    (y[i] += w[j]*b)
+                    id = id & sub(baT,:,j)
+                end
+            end
+            j+=1
+        end
+    end
+    return y
+end
 
 
-#
-# println(mean(b)/mean(b1))
-# println(mean(b)/mean(b2))
-# using HypothesisTests
-# # ApproximateTwoSampleKSTest(b1.samples.elapsed_times,b2.samples.elapsed_times)
-# ApproximateTwoSampleKSTest(b,b1)
-# ApproximateTwoSampleKSTest(b1,b2)
-# ApproximateTwoSampleKSTest(b,b2)
+function interp3{D,BF}(G::NGrid{D,BF},A,x,baT,jlim=D)
+    bf = (BF==Linear ? cc_bf_l : cc_bf_q)
+    nG = length(G)
+    w = getW(G,A)
+    y = zeros(size(x,1))
+    id = BitArray(nG)
+    for i = 1:length(y)
+        for j = 1:nG
+            id[j] = true
+        end
+        j = 1
+        jit=0
+        while j<=nG
+            if id[j]
+                b = 1.0
+                for d = 1:D
+                    b *= bf(x[i,d],G.grid[j,d],cc_M(level(G.grid[j,d])))
+                    b==0 && break
+                end
+                if b>0
+                    (y[i] += w[j]*b)
+
+                    (jit<jlim) && (id = id & sub(baT,:,j))
+                    jit+=1
+                end
+            end
+            j+=1
+        end
+    end
+    return y
+end
 
 
-nothing
+
+G = NGrid([2,2,2,2,2])
+f(x) = vec(prod(x[:,:].^5,2))
+x = SparseGrids.TensorGrid([4,4,4,4,4])
+
+for i = 1:30
+    id = indmax(abs(getW(G,f(G))).*G.adapt.active)
+    grow!(G,id)
+end
+
+
+(baT,T,Ts,Tp)=getparents(G);
+
+ay = SparseGrids.ainterp(G,f(G),X)
+y1 = interp1(G,f(G),X)
+y11 = interp11(G,f(G),X)
+y2 = interp2(G,f(G),X,baT)
+y3 = interp3(G,f(G),X,baT,5)
+@assert maximum(abs(ay-y1))<1e-15
+@assert maximum(abs(ay-y2))<1e-15
+@assert maximum(abs(ay-y3))<1e-15
+
+
+
+# ab = @benchmark ainterp(G,f(G),X)
+# a1 = @benchmark interp1(G,f(G),X)
+# a2 = @benchmark interp2(G,f(G),X,baT)
+# a3 = @benchmark interp3(G,f(G),X,baT)
+
+
+nrep = 1
+@time for i = 1:nrep SparseGrids.ainterp(G,f(G),X) end
+@time for i = 1:nrep interp1(G,f(G),X) end
+@time for i = 1:nrep interp11(G,f(G),X) end
+@time for i = 1:nrep interp2(G,f(G),X,baT) end
+@time for i = 1:nrep interp3(G,f(G),X,baT) end
+@time for i = 1:nrep interp3(G,f(G),X,baT,1) end
+
+@pview interp11(G,f(G),X)

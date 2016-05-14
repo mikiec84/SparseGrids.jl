@@ -1,9 +1,17 @@
 #include <cmath>
 #include <omp.h>
+#include <thread>
 #include <iostream>
+#include <emmintrin.h>
+#include <stdint.h>
+#include <cassert>
+#include <nmmintrin.h>
+#include <tmmintrin.h>
 using namespace std;
 
+
 #include "griddefs.cpp"
+#include "intersect.cpp"
 #include "cc_l.cpp"
 #include "cc_q.cpp"
 #include "test.cpp"

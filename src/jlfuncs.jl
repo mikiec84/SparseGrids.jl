@@ -1,107 +1,205 @@
- for i = 1:length(GridSpecs)
-    eval(:(function buildW(G::NGrid{$(GridSpecs[i][2])})
-        nc 		= size(G.coverings,1)
-        mL      = maximum(G.L)
-        D       = length(G.L)
-        J 		= ones(Int,mL+1,D)
-        B 		= zeros(mL+1,D)
-        for i = 1:length(G)
-            for d = 1:D
-                for l = 1:G.level[i]+1
-                    j 	= clamp(round(Int,G.grid[i,d]*(cc_dM(l))+1/2),1,cc_dM(l))
-                    B[l,d] 	= $(GridSpecs[i][3])(G.grid[i,d],cc_dg(l,j),Int16(cc_M(l)))
-                    J[l,d]  = j
-                end
-            end
-            for ii = 1:G.coveringsid[i]
-                b  = B[G.coverings[ii,D],D]*B[G.coverings[ii,1],1]
-                id1 = J[G.coverings[ii,D],D]-1
-                for d = D-1:-1:2
-                    b*=B[G.coverings[ii,d],d]
-                    id1 = id1*G.coverings_dM[ii,d]+(J[G.coverings[ii,d],d]-1)
-                end
-                id1=(J[G.coverings[ii,1],1]-1)+G.coverings_dM[ii,1]*id1+1+G.coveringsloc[1][ii]-1
-                if b>0
-                    push!(G.IDs[i],id1)
-                    push!(G.Bs[i],id1==i ? b : -b)
-                end
+function buildW{D,BF}(G::NGrid{D,BF},pr=1:length(G))
+    bf = (BF == Linear ? cc_bf_l : cc_bf_q)
+    nc 		= size(G.covers,1)
+    coversid     = Int32[findfirst(all(map(level,G.grid[i:i,:]).== G.covers,2)) for i = 1:size(G.grid,1)]
+    mL      = maximum(G.L)
+    J 		= ones(Int,mL+1,D)
+    B 		= zeros(mL+1,D)
+    for i = pr
+        G.IDs[i] = Int[]
+        G.Bs[i] = Float64[]
+        for d = 1:D
+            for l = 1:mL+1
+                j 	= clamp(round(Int,G.grid[i,d]*(cc_dM(l))+1/2),1,cc_dM(l))
+                B[l,d] 	= bf(G.grid[i,d],cc_dg(l,j),Int16(cc_M(l)))
+                J[l,d]  = j
             end
         end
-        return
-    end))
-
-
-
-	eval(:(function jl_interpbig(xi::Array{Float64},G::NGrid{$(GridSpecs[i][2])},A::Vector{Float64})
-		w 		= getW(G,A)
-		x 		= nXtoU(xi,G.bounds)
-		y 		= zeros(size(x,1))
-		nc 		= size(G.coverings,1)
-	    mL      = maximum(G.L)
-	    D       = length(G.L)
-
-		for i = 1:size(x,1)
-			J 		= ones(Int,mL+1,D)
-			B 		= zeros(mL+1,D)
-			id  	= zeros(Int,D)
-			for d = 1:D
-				for l = 1:mL+1
-					j 	= clamp(round(Int,x[i,d]*(cc_dM(l))+1/2),1,cc_dM(l))
-					B[l,d] 	= $(GridSpecs[i][3])(x[i,d],cc_dg(l,j),Int16(cc_M(l)))
-					J[l,d]  = j
-				end
-			end
-
-            for ii = 1:nc
-                b  = B[G.coverings[ii,D],D]*B[G.coverings[ii,1],1]
-                id1 = J[G.coverings[ii,D],D]-1
-                for d = D-1:-1:2
-                    b*=B[G.coverings[ii,d],d]
-                    id1 = id1*G.coverings_dM[ii,d]+(J[G.coverings[ii,d],d]-1)
-                end
-                id1=(J[G.coverings[ii,1],1]-1)+G.coverings_dM[ii,1]*id1+1+G.coveringsloc[1][ii]-1
-                y[i]+=b*w[id1]
+        for ii = 1:coversid[i]
+            b  = B[G.covers[ii,D],D]*B[G.covers[ii,1],1]
+            id1 = J[G.covers[ii,D],D]-1
+            for d = D-1:-1:2
+                b*=B[G.covers[ii,d],d]
+                id1 = id1*G.covers_dM[ii,d]+(J[G.covers[ii,d],d]-1)
             end
-		end
-		y
-	end))
+            id1=(J[G.covers[ii,1],1]-1)+G.covers_dM[ii,1]*id1+1+G.covers_loc[ii]-1
+            if b>0
+                push!(G.IDs[i],id1)
+                push!(G.Bs[i],id1==i ? b : -b)
+            end
+        end
+    end
+    return
+end
 
-    eval(:(function jl_interpbig(xi::Array{Float64},G::NGrid{$(GridSpecs[i][2])},A::Array{Float64,2})
-        x 		= nXtoU(xi,G.bounds)
-        nc 		= size(G.coverings,1)
-        nA      = size(A,2)
-		w 		= getW(G,A)
-		y 		= zeros(size(x,1),nA)
-	    mL      = maximum(G.L)
-	    D       = length(G.L)
 
-		for i = 1:size(x,1)
-			J 		= ones(Int,mL+1,D)
-			B 		= zeros(mL+1,D)
-			id  	= zeros(Int,D)
-            for d = 1:D
-				for l = 1:mL+1
-					j 	= clamp(round(Int,x[i,d]*(cc_dM(l))+1/2),1,cc_dM(l))
-					B[l,d] 	= $(GridSpecs[i][3])(x[i,d],cc_dg(l,j),Int16(cc_M(l)))
-					J[l,d]  = j
-				end
-			end
+Lbj = quote
+@inbounds for d in dr1
+    J[2,d] = (x[i,d]>0.5)
+    B[2,d] = (1.0-2*abs(x[i,d]-J[2,d]))
+end
+@inbounds for l = 3:mL
+    dm = 2^(l-2)
+    m  = dm*2
+    for d in dr1
+        j 	= clamp(round(Int,x[i,d]*dm+1/2),1,dm)
+        xij = (2j-1)/m
+        dx = (1.0-(m)*abs(x[i,d]-xij))
+        B[l,d] 	= dx
+        J[l,d]  = j-1
+    end
+end
+end
 
-            for ii = 1:nc
-                b  = B[G.coverings[ii,D],D]*B[G.coverings[ii,1],1]
-                id1 = J[G.coverings[ii,D],D]-1
-                for d = D-1:-1:2
-                    b*=B[G.coverings[ii,d],d]
-                    id1 = id1*G.coverings_dM[ii,d]+(J[G.coverings[ii,d],d]-1)
-                end
-                id1=(J[G.coverings[ii,1],1]-1)+G.coverings_dM[ii,1]*id1+1+G.coveringsloc[1][ii]-1
-                for iii = 1:nA
-                    y[i,iii]+=b*w[id1,iii]
+Qbj=quote
+@inbounds for d in dr1
+    J[2,d] = (x[i,d]>0.5)
+    B[2,d] = 1.0-(2*(x[i,d]-J[2,d]))^2
+end
+@inbounds for l = 3:mL
+    dm = 2^(l-2)
+    m  = dm*2
+    for d in dr1
+        j 	= clamp(round(Int,x[i,d]*dm+1/2),1,dm)
+        xij = (2j-1)/m
+        dx = 1.0-(m*(x[i,d]-xij))^2
+        # B[l,d] 	= (dx>0.0) ? dx : 0.0
+        B[l,d] 	= dx
+        J[l,d]  = j-1
+    end
+end
+end
+
+
+
+for b in [(Linear,Lbj),(Quadratic,Qbj)]
+    for D = 2:12
+        coverloop = :(@inbounds for ii in nc
+            b   = B[G.covers[ii,$D],$D]*B[G.covers[ii,1],1]
+            id1 = J[G.covers[ii,$D],$D]
+        end)
+        for d in D-1:-1:2
+            push!(coverloop.args[2].args[2].args,:(b  *= B[G.covers[ii,$d],$d]))
+            push!(coverloop.args[2].args[2].args,:(id1 = id1*G.covers_dM[ii,$d]+J[G.covers[ii,$d],$d]))
+        end
+
+        push!(coverloop.args[2].args[2].args,:(id1 = id1*G.covers_dM[ii,1]+G.covers_loc[ii]+J[G.covers[ii,1],1];yi += b*w[id1]))
+
+        f=:(function jl_interp(G::NGrid{$D,$(b[1])},A::Vector{Float64},xi::Array{Float64,2},y = zeros(Float64,size(xi,1)))
+            w         = getW(G,A)
+            x         = nXtoU(xi,G.bounds)
+            nx        = size(x,1)
+            # y         = zeros(Float64,nx)
+            nc         = 1:size(G.covers,1)
+            dr1 = 1:$D
+            mL      = maximum(G.L)+1
+            J         = zeros(Int,mL,$D)
+            B         = ones(mL,$D)
+
+            @threads [J,B] for i = 1:nx
+                $(b[2])
+                yi = 0.0
+                coverloop
+                y[i] = yi
+            end
+            y
+        end)
+
+        subs!(f,:coverloop=>coverloop)
+        eval(current_module(),f)
+    end
+end
+
+type dimdef{n} end
+
+
+for b in [(Linear,Lbj),(Quadratic,Qbj)]
+    for D = 2:12
+        for adim = 1:8
+            coverloop = quote
+                fill!(yi,0.0)
+                @inbounds for ii in nc
+                    b   = B[G.covers[ii,$D],$D]*B[G.covers[ii,1],1]
+                    id1 = J[G.covers[ii,$D],$D]
                 end
             end
-		end
-		y
-	end))
+            for d in D-1:-1:2
+                push!(coverloop.args[4].args[2].args[2].args,:(b  *= B[G.covers[ii,$d],$d]))
+                push!(coverloop.args[4].args[2].args[2].args,:(id1 = id1*G.covers_dM[ii,$d]+J[G.covers[ii,$d],$d]))
+            end
+            push!(coverloop.args[4].args[2].args[2].args,:(id1 = id1*G.covers_dM[ii,1]+G.covers_loc[ii]+J[G.covers[ii,1],1]))
+            for d = 1:adim
+                push!(coverloop.args[4].args[2].args[2].args,:(yi[$d]+=b*w[id1,$d]))
+                push!(coverloop.args,:(@inbounds y[i,$d]=yi[$d]))
+            end
+
+            f=:(function jl_interp(G::NGrid{$D,$(b[1])},A::Array{Float64,2},xi::Array{Float64,2},nA::dimdef{$adim},y::Array{Float64,2})
+                w         = getW(G,A)
+                x         = nXtoU(xi,G.bounds)
+                nx        = size(x,1)
+
+                # y         = zeros(Float64,nx,$adim)
+                nc         = 1:size(G.covers,1)
+                dr1 = 1:$D
+                mL      = maximum(G.L)+1
+                J         = zeros(Int,mL,$D)
+                B         = ones(mL,$D)
+                yi        = zeros($adim)
+
+                @threads [J,B,yi] for i = 1:nx
+                    $(b[2])
+                    coverloop
+                end
+                y
+            end)
+
+            subs!(f,:coverloop=>coverloop)
+            eval(current_module(),f)
+        end
+    end
+end
+
+jl_interp(G::NGrid,A::Array{Float64,2},x::Array{Float64,2},y=zeros(size(x,1),size(A,2))) = jl_interp(G,A,x,dimdef{size(A,2)}(),y)
+
+
+
+
+
+function jl_interpbig{D,BF}(G::NGrid{D,BF},A::Array{Float64,2},xi::Array{Float64})
+    bf = (BF == Linear ? cc_bf_l : cc_bf_q)
+    x 		= nXtoU(xi,G.bounds)
+    nc 		= size(G.covers,1)
+    nA      = size(A,2)
+    w 		= getW(G,A)
+    y 		= zeros(size(x,1),nA)
+    mL      = maximum(G.L)
+
+    for i = 1:size(x,1)
+        J 		= ones(Int,mL+1,D)
+        B 		= ones(mL+1,D)
+        id  	= zeros(Int,D)
+        for d = 1:D
+            for l = 1:mL+1
+                j 	= clamp(round(Int,x[i,d]*(cc_dM(l))+1/2),1,cc_dM(l))
+                B[l,d] 	= bf(x[i,d],cc_dg(l,j),Int16(cc_M(l)))
+                J[l,d]  = j
+            end
+        end
+
+        for ii = 1:nc
+            b  = B[G.covers[ii,D],D]*B[G.covers[ii,1],1]
+            id1 = J[G.covers[ii,D],D]-1
+            for d = D-1:-1:2
+                b*=B[G.covers[ii,d],d]
+                id1 = id1*G.covers_dM[ii,d]+(J[G.covers[ii,d],d]-1)
+            end
+            id1=(J[G.covers[ii,1],1]-1)+G.covers_dM[ii,1]*id1+1+G.covers_loc[ii]-1
+            for iii = 1:nA
+                y[i,iii]+=b*w[id1,iii]
+            end
+        end
+    end
+    y
 end
 
 

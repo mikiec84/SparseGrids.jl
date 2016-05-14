@@ -10,6 +10,9 @@ include("grids.jl")
 include("jlfuncs.jl")
 include("cfuncs.jl")
 include("api.jl")
+include("analyse.jl")
+include("adapt.jl")
+include("newinterp.jl")
 
 precompile(NGrid,(Vector{Int},))
 
@@ -27,6 +30,7 @@ export BasisFunction,
        NGrid,
        getW,
        interp,
+	   level,
 	   shrink!,
 	   grow!
 end

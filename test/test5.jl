@@ -1,63 +1,143 @@
-import SparseGrids: jl_interpslow,jl_interp,jl_interpbig,c_interp,c_interpbig,nXtoU
-import SparseGrids:GridType,UnivariateGrid,BasisFunction,SmolyakGrid,level,level_loc,nextid,hsh,nXtoU
+using Benchmarks,DevTools,MyDisplay
+res=Array(Benchmarks.Results,5,2)
 
-function interpbig1(xi::Array{Float64},G::NGrid,A::Vector{Float64})
-   w = getW(G,A)
-   x = nXtoU(xi,G.bounds)
-   y = zeros(size(x,1))
-   nc = size(G.coverings,1)
-   mL      = maximum(G.L)
-   D       = length(G.L)
+# for d = 2:6
+#     G = NGrid(ones(Int,d)*6)
+#     A = rand(length(G))
+#     x = rand(length(G)*10,length(G.L))
+#
+#     G(A,x)
+#     SparseGrids.jl_interp(G,A,x)
+#     res[d-1,1] = @benchmark G(A,x)
+#     sleep(15)
+#     res[d-1,2] = @benchmark SparseGrids.jl_interp(G,A,x)
+#     sleep(15)
+# end
 
-   for i = 1:length(y)
-       J = ones(Int,mL+1,D)
-       B = zeros(mL+1,D)
-       id      = zeros(Int,D)
-       for d = 1:D
-           for l = 1:mL+1
-               j = clamp(round(Int,x[i,d]*(cc_dM(l))+1/2),1,cc_dM(l))
-               B[l,d] = cc_bf_l(x[i,d],cc_dg(l,j),Int16(cc_M(l)))
-               J[l,d]  = cc_itoi(l,j,mL+1)
-           end
-       end
+import SparseGrids:nXtoU,@threads,subs!
+for b in [(Linear,Lbj),(Quadratic,Qbj)]
+    for D = 2:12
+        coverloop = :(@inbounds for ii in nc
+            b   = B[G.covers[ii,$D],$D]*B[G.covers[ii,1],1]
+            id1 = J[G.covers[ii,$D],$D]
+        end)
+        for d in D-1:-1:2
+            push!(coverloop.args[2].args[2].args,:(b  *= B[G.covers[ii,$d],$d]))
+            push!(coverloop.args[2].args[2].args,:(id1 = id1*G.covers_dM[ii,$d]+J[G.covers[ii,$d],$d]))
+        end
 
-       for ii = 1:nc
-           b = 1.0
-           hid = 0
-           for d = 1:D
-               b*=B[G.coverings[ii,d],d]
-               hid +=J[G.coverings[ii,d],d]
-               hid *=17
-           end
+        push!(coverloop.args[2].args[2].args,:(id1 = id1*G.covers_dM[ii,1]+G.covers_loc[ii]+J[G.covers[ii,1],1];yi += b*w[id1]))
 
-           id1 = Int32(0)
-           if (G.coveringsloc[2][ii]-G.coveringsloc[1][ii])> 20
-               for iii = G.coveringsloc[1][ii]:G.coveringsloc[2][ii]
-                   G.hashG[iii]==hid ? (id1=iii;break) : nothing
-               end
-            else
-               id0 = Int32(G.coveringsloc[1][ii])
-               id2 = Int32(G.coveringsloc[2][ii])
-               while true
-                   G.hashG[id0]==hid ? (id1=id0;break) : nothing
-                   G.hashG[id2]==hid ? (id1=id2;break) : nothing
-                   id1=div(id0+id2,Int32(2))
-                   G.hashG[id1]>hid ? (id2=id1) : (id0=id1)
-               end
-           end
-           y[i]+=b*w[id1]
-       end
-   end
-   y
+        f=:(function jl_interp(G::NGrid{$D,$(b[1])},A::Vector{Float64},xi::Array{Float64,2})
+            w         = getW(G,A)
+            x         = nXtoU(xi,G.bounds)
+            nx        = size(x,1)
+            y         = zeros(Float64,nx)
+            nc         = 1:size(G.covers,1)
+            dr1 = 1:$D
+            mL      = maximum(G.L)+1
+            J         = zeros(Int,mL,$D)
+            B         = ones(mL,$D)
+
+            @threads [J,B] for i = 1:nx
+                $(b[2])
+                yi = 0.0
+                coverloop
+                y[i] = yi
+            end
+            y
+        end)
+
+        subs!(f,:coverloop=>coverloop)
+        eval(current_module(),f)
+    end
+end
+
+for b in [(Linear,Lbj),(Quadratic,Qbj)]
+    for D = 2:12
+        coverloop = :(@inbounds for ii in nc
+            b   = B[G.covers[ii,$D],$D]*B[G.covers[ii,1],1]
+            id1 = J[G.covers[ii,$D],$D]
+        end)
+        for d in D-1:-1:2
+            push!(coverloop.args[2].args[2].args,:(b  *= B[G.covers[ii,$d],$d]))
+            push!(coverloop.args[2].args[2].args,:(id1 = id1*G.covers_dM[ii,$d]+J[G.covers[ii,$d],$d]))
+        end
+
+        push!(coverloop.args[2].args[2].args,:(id1 = id1*G.covers_dM[ii,1]+G.covers_loc[ii]+J[G.covers[ii,1],1];for d=1:nA;y[i,d] += b*w[id1,d];end))
+
+        f=:(function jl_interp(G::NGrid{$D,$(b[1])},A::Array{Float64,2},xi::Array{Float64,2})
+            w         = getW(G,A)
+            x         = nXtoU(xi,G.bounds)
+            nx        = size(x,1)
+            nA        = size(A,2)
+            y         = zeros(Float64,nx,nA)
+            nc         = 1:size(G.covers,1)
+            dr1 = 1:$D
+            mL      = maximum(G.L)+1
+            J         = zeros(Int,mL,$D)
+            B         = ones(mL,$D)
+
+            for i = 1:nx
+                $(b[2])
+                coverloop
+            end
+            y
+        end)
+
+        subs!(f,:coverloop=>coverloop)
+        eval(current_module(),f)
+    end
 end
 
 
-L = [8,8,5]
-G = NGrid(CC,L)
-x=  rand(length(G),length(L))
 
-# @timecnt y=SparseGrids.c_interp(x,G,f(G.grid)) 1
-# @timecnt yb=SparseGrids.c_interpbig(x,G,f(G.grid)) 1
+G = NGrid([6,6,3,4,4])
+A = rand(length(G),3)
+x = rand(length(G)*10,length(G.L))
+# bc = @benchmark G(A[:,1],x)
+# bj = @benchmark SparseGrids.jl_interp(G,A[:,1],x)
+b0=(@benchmark SparseGrids.jl_interp(G,A,x))
+b1= (@benchmark jl_interp1(G,A,x))
+ b2=(@benchmark jl_interp2(G,A,x))
 
-@timecnt SparseGrids.jl_interpbig(x,G,f(G.grid)) 1
-@timecnt interpbig1(x,G,f(G.grid)) 1
+Profile.init(delay=0.00000001)
+Profile.clear()
+@profile jl_interp1(G,A,x)
+profiler()
+Profile.clear()
+@profile jl_interp2(G,A,x)
+profiler()
+
+
+#
+#
+# b0 =@benchmark G(A,x)
+# sleep(20)
+# # b1 =@benchmark jl_interp(G,A,x)
+# # sleep(20)
+# b5 =@benchmark jl_interp5(G,A,x)
+# sleep(20)
+# b6 =@benchmark jl_interp6(G,A,x)
+# sleep(20)
+# b7 =@benchmark SparseGrids.jl_interp(G,A,x)
+#
+# @time for i = 1:50; G(A,x) ; end
+# @time for i = 1:50; SparseGrids.jl_interp(G,A,x) ; end
+# plot([b0,b7])
+# #
+# Y = G(A,x)
+# @assert SparseGrids.jl_interp(G,A,x)==Y
+#
+# # sleep(10)
+# # b0 = @benchmark G(A,x)
+# # sleep(20)
+# # b1 = @benchmark SparseGrids.jl_interp(G,A,x)
+# # plot([b0,b1])
+# plot([(@benchmark jl_interp(G,A,x)),(@benchmark jl_interpfm(G,A,x))])
+#
+# Profile.clear()
+# Profile.init(delay=0.000001)
+# @profile jl_interp(G,A,x)
+#
+# s=pview();

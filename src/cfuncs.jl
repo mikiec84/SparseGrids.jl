@@ -4,85 +4,69 @@ const lsparse = Pkg.dir("SparseGrids")*"/deps/libsparse.so"
 #  CC   Linear
 ###############################################################################
 
-function c_getW(G::NGrid{Linear},A::Vector{Float64})
-    Aold 	= zeros(length(G))
-    dA 		= zeros(length(G))
-    w 		= zeros(length(G))
-    ccall((:_Z6w_cc_liiiPdS_PsPiS_S_S_,lsparse),
-        Void,
-        (Int32,Int32,Int32,
-        Ptr{Float64},Ptr{Float64},Ptr{Int16},Ptr{Float64},
-        Ptr{Float64},Ptr{Float64},Ptr{Float64}),
-        length(G),size(G.grid,2),maximum(G.L),
-        pointer(G.grid),pointer(A),pointer(G.level_M),pointer(G.level_loc),
-        pointer(Aold),pointer(dA),pointer(w))
-    return w
-end
 
-function c_getW(G::NGrid{Linear},A::Array{Float64,2})
-    Aold 	= zeros(size(A))
-    w 		= zeros(size(A))
-    ccall((:_Z10w_cc_l_arrPdiiiiPsPiS_S_S_,lsparse),
-        Void,
-        (Ptr{Float64},Int32,Int32,Int32,Int32,
-         Ptr{Int16},Ptr{Float64},Ptr{Float64},
-         Ptr{Float64},Ptr{Float64}),
-        pointer(G.grid),length(G),size(G.grid,2),maximum(G.L),size(A,2),
-        pointer(G.level_M),pointer(G.level_loc),pointer(A),
-        pointer(Aold),pointer(w))
-    return w
-end
-
-function c_interp(xi::Array{Float64},G::NGrid{Linear},A::Vector{Float64})
-    x 		= nXtoU(xi,G.bounds)
-    y 		= zeros(size(xi,1))
-    w 		= c_getW(G,A)
-    ccall((:_Z11interp_cc_liiiiPdPsS_S_S_Pi,lsparse),
-        Void,
-        (Int32,Int32,Int32,Int32,Ptr{Float64},Ptr{Int16},Ptr{Float64},Ptr{Float64},Ptr{Float64},Ptr{Float64}),
-        length(G.L),maximum(G.L),size(G.grid,1),size(x,1),pointer(G.grid),pointer(G.level_M),pointer(w),pointer(x),pointer(y),pointer(G.nextid))
-    return y
-end
-
-function c_interp(xi::Array{Float64},G::NGrid{Linear},A::Array{Float64,2})
-    x 		= nXtoU(xi,G.bounds)
-    y 		= zeros(size(x,1),size(A,2))
-    w 		= c_getW(G,A)
-    ccall((:_Z15interp_cc_l_arriiiiiPdPsS_S_S_Pi,lsparse),
-        Void,
-        (Int32,Int32,Int32,Int32,Int32,Ptr{Float64},Ptr{Int16},Ptr{Float64},Ptr{Float64},Ptr{Float64},Ptr{Float64}),
-        length(G.L),maximum(G.L),size(G.grid,1),size(x,1),size(A,2),pointer(G.grid),pointer(G.level_M),pointer(w),pointer(x),pointer(y),pointer(G.nextid))
-    return y
-end
-
-function c_interpbig(xi::Array{Float64},G::NGrid{Linear},A::Vector{Float64})
+function c_interp{D}(G::NGrid{D,Linear},A::Vector{Float64},xi::Array{Float64})
     x 		= clamp!(nXtoU(xi,G.bounds),0.0,1.0)
     y 		= zeros(size(xi,1))
     w 		= jl_getWbig(G,A)
-    ccall((:_Z15interp_cc_l_biglllllPdS_S_PsS0_PiS1_,lsparse),
+    ccall((:_Z8interp_lllllPdS_S_PsS0_Pi,lsparse),
         Void,
-        (Int32,Int32,Int32,Int32,Int32,
+        (Int32,Int32,Int32,Int32,
         Ptr{Float64},Ptr{Float64},Ptr{Float64},
-        Ptr{Int16},Ptr{Int16},Ptr{Int32},Ptr{Int32}),
-        length(G.L),maximum(G.L),size(G.grid,1),size(x,1),size(G.coverings,1),
+        Ptr{Int16},Ptr{Int16},Ptr{Int32}),
+        length(G.L),maximum(G.L),size(x,1),size(G.covers,1),
         pointer(x),pointer(w),pointer(y),
-        pointer(G.coverings),pointer(G.coverings_dM),pointer(G.coveringsloc[1]),pointer(G.coveringsloc[2]))
+        pointer(G.covers),pointer(G.covers_dM),pointer(G.covers_loc))
     return y
 end
 
-function c_interpbig(xi::Array{Float64},G::NGrid{Linear},A::Array{Float64,2})
+function c_interp{D}(G::NGrid{D,Linear},A::Array{Float64,2},xi::Array{Float64})
     x 		= clamp!(nXtoU(xi,G.bounds),0.0,1.0)
     y 		= zeros(size(x,1),size(A,2))
     w 		= jl_getWbig(G,A)
 
-    ccall((:_Z19interp_cc_l_big_arrllllllPdS_S_PsS0_PiS1_,lsparse),
+    ccall((:_Z8interp_lllllllPdS_S_PsS0_Pi,lsparse),
         Void,
         (Int32,Int32,Int32,Int32,Int32,Int32,
         Ptr{Float64},Ptr{Float64},Ptr{Float64},
-        Ptr{Int16},Ptr{Int16},Ptr{Int32},Ptr{Int32}),
-        length(G.L),maximum(G.L),size(G.grid,1),size(x,1),size(G.coverings,1),size(A,2),
+        Ptr{Int16},Ptr{Int16},Ptr{Int32}),
+        length(G.L),maximum(G.L),size(G.grid,1),size(x,1),size(G.covers,1),size(A,2),
         pointer(x),pointer(w),pointer(y),
-        pointer(G.coverings),pointer(G.coverings_dM),pointer(G.coveringsloc[1]),pointer(G.coveringsloc[2]))
+        pointer(G.covers),pointer(G.covers_dM),pointer(G.covers_loc))
+    return y
+end
+
+function c_interp_a{D}(G::NGrid{D,Linear},A::Array{Float64,1},xi::Array{Float64})
+    x 		= clamp!(nXtoU(xi,G.bounds),0.0,1.0)
+    y 		= zeros(size(x,1),size(A,2))
+    w 		= jl_getWbig(G,A)
+    Mgrid = map(Int32,map(SparseGrids.cc_M,map(level,G.grid)))
+
+    ccall((:_Z8interp_llllllPdS_S_S_PsS0_PiS1_,lsparse),
+        Void,
+        (Int32,Int32,Int32,Int32,Int32,
+        Ptr{Float64},Ptr{Float64},Ptr{Float64},Ptr{Float64},
+        Ptr{Int16},Ptr{Int16},Ptr{Int32},Ptr{Int32}),
+        D,maximum(G.L),size(G.grid,1),size(x,1),size(G.covers,1),
+        pointer(G.grid),pointer(x),pointer(w),pointer(y),
+        pointer(G.covers),pointer(G.covers_dM),pointer(G.covers_loc),pointer(Mgrid))
+    return y
+end
+
+function c_interp_a{D}(G::NGrid{D,Linear},A::Array{Float64,2},xi::Array{Float64})
+    x 		= clamp!(nXtoU(xi,G.bounds),0.0,1.0)
+    y 		= zeros(size(x,1),size(A,2))
+    w 		= jl_getWbig(G,A)
+    Mgrid = map(Int32,map(SparseGrids.cc_M,map(level,G.grid)))
+
+    ccall((:_Z8interp_lllllllPdS_S_S_PsS0_PiS1_,lsparse),
+        Void,
+        (Int32,Int32,Int32,Int32,Int32,Int32,
+        Ptr{Float64},Ptr{Float64},Ptr{Float64},Ptr{Float64},
+        Ptr{Int16},Ptr{Int16},Ptr{Int32},Ptr{Int32}),
+        D,maximum(G.L),size(G.grid,1),size(x,1),size(G.covers,1),size(A,2),
+        pointer(G.grid),pointer(x),pointer(w),pointer(y),
+        pointer(G.covers),pointer(G.covers_dM),pointer(G.covers_loc),pointer(Mgrid))
     return y
 end
 
@@ -91,83 +75,91 @@ end
 ###############################################################################
 
 
-function c_getW(G::NGrid{Quadratic},A::Vector{Float64})
-    Aold 	= zeros(length(G))
-    dA 		= zeros(length(G))
-    w 		= zeros(length(G))
-    ccall((:_Z6w_cc_qPdiiiPsPiS_S_S_S_,lsparse),
-        Void,
-        (Ptr{Float64},Int32,Int32,Int32,
-         Ptr{Int16},Ptr{Float64},Ptr{Float64},
-         Ptr{Float64},Ptr{Float64},Ptr{Float64}),
-        pointer(G.grid),length(G),size(G.grid,2),maximum(G.L),
-        pointer(G.level_M),pointer(G.level_loc),pointer(A),
-        pointer(Aold),pointer(dA),pointer(w))
-    return w
-end
-
-function c_getW(G::NGrid{Quadratic},A::Array{Float64,2})
-    Aold 	= zeros(size(A))
-    w 		= zeros(size(A))
-    ccall((:_Z10w_cc_q_arrPdiiiiPsPiS_S_S_,lsparse),
-        Void,
-        (Ptr{Float64},Int32,Int32,Int32,Int32,
-         Ptr{Int16},Ptr{Float64},Ptr{Float64},
-         Ptr{Float64},Ptr{Float64}),
-        pointer(G.grid),length(G),size(G.grid,2),maximum(G.L),size(A,2),
-        pointer(G.level_M),pointer(G.level_loc),pointer(A),
-        pointer(Aold),pointer(w))
-    return w
-end
-
-function c_interp(xi::Array{Float64},G::NGrid{Quadratic},A::Vector{Float64})
-    x 		= nXtoU(xi,G.bounds)
-    y 		= zeros(size(xi,1))
-    w 		= c_getW(G,A)
-    ccall((:_Z11interp_cc_qiiiiPdPsS_S_S_Pi,lsparse),
-        Void,
-        (Int32,Int32,Int32,Int32,Ptr{Float64},Ptr{Int16},Ptr{Float64},Ptr{Float64},Ptr{Float64},Ptr{Float64}),
-        length(G.L),maximum(G.L),size(G.grid,1),size(x,1),pointer(G.grid),pointer(G.level_M),pointer(w),pointer(x),pointer(y),pointer(G.nextid))
-    return y
-end
-
-function c_interp(xi::Array{Float64},G::NGrid{Quadratic},A::Array{Float64,2})
-    x 		= nXtoU(xi,G.bounds)
-    y 		= zeros(size(x,1),size(A,2))
-    w 		= c_getW(G,A)
-    ccall((:_Z15interp_cc_q_arriiiiiPdPsS_S_S_Pi,lsparse),
-        Void,
-        (Int32,Int32,Int32,Int32,Int32,Ptr{Float64},Ptr{Int16},Ptr{Float64},Ptr{Float64},Ptr{Float64},Ptr{Float64}),
-        length(G.L),maximum(G.L),size(G.grid,1),size(x,1),size(A,2),pointer(G.grid),pointer(G.level_M),pointer(w),pointer(x),pointer(y),pointer(G.nextid))
-    return y
-end
-
-function c_interpbig(xi::Array{Float64},G::NGrid{Quadratic},A::Vector{Float64})
+function c_interp{D}(G::NGrid{D,Quadratic},A::Vector{Float64},xi::Array{Float64})
     x 		= clamp!(nXtoU(xi,G.bounds),0.0,1.0)
     y 		= zeros(size(xi,1))
     w 		= jl_getWbig(G,A)
-    ccall((:_Z15interp_cc_q_biglllllPdS_S_PsS0_PiS1_,lsparse),
+    ccall((:_Z8interp_qllllPdS_S_PsS0_Pi,lsparse),
         Void,
-        (Int32,Int32,Int32,Int32,Int32,
+        (Int32,Int32,Int32,Int32,
         Ptr{Float64},Ptr{Float64},Ptr{Float64},
-        Ptr{Int16},Ptr{Int16},Ptr{Int32},Ptr{Int32}),
-        length(G.L),maximum(G.L),size(G.grid,1),size(x,1),size(G.coverings,1),
+        Ptr{Int16},Ptr{Int16},Ptr{Int32}),
+        length(G.L),maximum(G.L),size(x,1),size(G.covers,1),
         pointer(x),pointer(w),pointer(y),
-        pointer(G.coverings),pointer(G.coverings_dM),pointer(G.coveringsloc[1]),pointer(G.coveringsloc[2]))
+        pointer(G.covers),pointer(G.covers_dM),pointer(G.covers_loc))
     return y
 end
 
-function c_interpbig(xi::Array{Float64},G::NGrid{Quadratic},A::Array{Float64,2})
+function c_interp{D}(G::NGrid{D,Quadratic},A::Array{Float64,2},xi::Array{Float64})
     x 		= clamp!(nXtoU(xi,G.bounds),0.0,1.0)
     y 		= zeros(size(x,1),size(A,2))
     w 		= jl_getWbig(G,A)
-    ccall((:_Z19interp_cc_q_big_arrllllllPdS_S_PsS0_PiS1_,lsparse),
+
+    ccall((:_Z8interp_qllllllPdS_S_PsS0_Pi,lsparse),
         Void,
         (Int32,Int32,Int32,Int32,Int32,Int32,
         Ptr{Float64},Ptr{Float64},Ptr{Float64},
-        Ptr{Int16},Ptr{Int16},Ptr{Int32},Ptr{Int32}),
-        length(G.L),maximum(G.L),size(G.grid,1),size(x,1),size(G.coverings,1),size(A,2),
+        Ptr{Int16},Ptr{Int16},Ptr{Int32}),
+        length(G.L),maximum(G.L),size(G.grid,1),size(x,1),size(G.covers,1),size(A,2),
         pointer(x),pointer(w),pointer(y),
-        pointer(G.coverings),pointer(G.coverings_dM),pointer(G.coveringsloc[1]),pointer(G.coveringsloc[2]))
+        pointer(G.covers),pointer(G.covers_dM),pointer(G.covers_loc))
     return y
+end
+
+function c_interp_a{D}(G::NGrid{D,Quadratic},A::Array{Float64,1},xi::Array{Float64})
+    x 		= clamp!(nXtoU(xi,G.bounds),0.0,1.0)
+    y 		= zeros(size(x,1),size(A,2))
+    w 		= jl_getWbig(G,A)
+    Mgrid = map(Int32,map(SparseGrids.cc_M,map(level,G.grid)))
+
+    ccall((:_Z8interp_qlllllPdS_S_S_PsS0_PiS1_,lsparse),
+        Void,
+        (Int32,Int32,Int32,Int32,Int32,
+        Ptr{Float64},Ptr{Float64},Ptr{Float64},Ptr{Float64},
+        Ptr{Int16},Ptr{Int16},Ptr{Int32},Ptr{Int32}),
+        D,maximum(G.L),size(G.grid,1),size(x,1),size(G.covers,1),
+        pointer(G.grid),pointer(x),pointer(w),pointer(y),
+        pointer(G.covers),pointer(G.covers_dM),pointer(G.covers_loc),pointer(Mgrid))
+    return y
+end
+
+
+function c_interp_a{D}(G::NGrid{D,Quadratic},A::Array{Float64,2},xi::Array{Float64})
+    x 		= clamp!(nXtoU(xi,G.bounds),0.0,1.0)
+    y 		= zeros(size(x,1),size(A,2))
+    w 		= jl_getWbig(G,A)
+    Mgrid = map(Int32,map(SparseGrids.cc_M,map(level,G.grid)))
+
+    ccall((:_Z8interp_qllllllPdS_S_S_PsS0_PiS1_,lsparse),
+        Void,
+        (Int32,Int32,Int32,Int32,Int32,Int32,
+        Ptr{Float64},Ptr{Float64},Ptr{Float64},Ptr{Float64},
+        Ptr{Int16},Ptr{Int16},Ptr{Int32},Ptr{Int32}),
+        D,maximum(G.L),size(G.grid,1),size(x,1),size(G.covers,1),size(A,2),
+        pointer(G.grid),pointer(x),pointer(w),pointer(y),
+        pointer(G.covers),pointer(G.covers_dM),pointer(G.covers_loc),pointer(Mgrid))
+    return y
+end
+
+
+
+
+
+
+
+
+function cintersect(A::Vector{UInt32},B::Vector{UInt32})
+    C  = Array(UInt32,length(A))
+    n = ccall((:_Z9intersectPKjmS0_mPj,SparseGrids.lsparse),Csize_t,(Ptr{UInt32},Csize_t,Ptr{UInt32},Csize_t,Ptr{UInt32}),pointer(A),length(A),pointer(B),length(B),pointer(C))
+    C[1:n]
+end
+
+function cintersect(A::Vector{UInt32},B::Vector{UInt32},C::Vector{UInt32})
+    n = ccall((:_Z9intersectPKjmS0_mPj,SparseGrids.lsparse),Csize_t,(Ptr{UInt32},Csize_t,Ptr{UInt32},Csize_t,Ptr{UInt32}),pointer(A),length(A),pointer(B),length(B),pointer(C))
+    return n
+end
+
+function cintersect(A::Vector{UInt32},B::Vector{UInt32},C::Vector{UInt32},na::Int,nb::Int)
+    n = ccall((:_Z9intersectPKjmS0_mPj,SparseGrids.lsparse),Csize_t,(Ptr{UInt32},Csize_t,Ptr{UInt32},Csize_t,Ptr{UInt32}),pointer(A),na,pointer(B),nb,pointer(C))
+    return n
 end

@@ -4,7 +4,7 @@ using SparseGrids,Base.Test
 
 println("1→2 Dimensions")
 
-for d ∈ 1:6, l ∈ 1:4, B ∈ [Linear,Quadratic]
+for d ∈ 2:6, l ∈ 2:4, B ∈ [Linear,Quadratic]
     G = NGrid(ones(Int,l)*d,B=B)
     A = rand(length(G))
     @test maximum(abs(G(A,G.grid)-A))<1e-14

@@ -31,10 +31,23 @@ UtoX(U::Array{Float64,1},bnds::Array{Float64,1}) = XtoX(U,[0.0,1.0],bnds)
 XtoU(X::Array{Float64,1},bnds::Array{Float64,1}) = XtoX(X,bnds,[0.0,1.0])
 
 nUtoX(U::Array{Float64,2},bnds::Array{Float64,2}) = nXtoX(U,[zeros(1,size(U,2));ones(1,size(U,2))],bnds)
-nXtoU(X::Array{Float64,2},bnds::Array{Float64,2}) = nXtoX(X,bnds,[zeros(1,size(X,2));ones(1,size(X,2))])
+# nXtoU(X::Array{Float64,2},bnds::Array{Float64,2}) = nXtoX(X,bnds,[zeros(1,size(X,2));ones(1,size(X,2))])
 nXtoU(X::Array{Float64,1},bnds::Array{Float64,2}) = XtoX(X,bnds[:],[0.0,1.0])
 nUtoX(U::Array{Float64,1},bnds::Array{Float64,2}) = XtoX(U,[0.0,1.0],bnds[:])
 
+
+function nXtoU(X::Array{Float64,2},bnds1::Array{Float64,2})
+	N,R = size(X)
+	out = Array(Float64,size(X))
+	for r = 1:R
+		lb1 = minimum(bnds1[:,r])
+		ub1 = maximum(bnds1[:,r])
+		@inbounds for i = 1:N
+			out[i,r] = (X[i,r]-lb1)/(ub1-lb1)
+		end
+	end
+	return out
+end
 
 function hsh(x::Vector{Int})
 	h = x[1]*17
@@ -59,68 +72,106 @@ function hsh(x::Array{Int,2})
 end
 
 
-# function swap!(x::Vector{Int},i::Int,j::Int)
-# 	ta 	= x[i]
-# 	x[i]=x[j]
-# 	x[j]=ta
-# 	return nothing
-# end
-#
-# function next_permute!(seq::Vector{Int})
-# 	n = length(seq)
-# 	j = n-1
-# 	while seq[j]>=seq[j+1]
-# 		j-=1
-# 		if j==0
-# 			return true
-# 		end
-# 	end
-# 	l = n
-# 	while seq[j]>=seq[l]
-# 		l-=1
-# 	end
-# 	swap!(seq,j,l)
-#
-# 	seq[j+1:n]=reverse(seq[j+1:n])
-# 	return false
-# end
-#
-# function get_perms(seq::Vector{Int})
-# 	a = sort(seq)
-# 	out = Array(Vector{Int},1)
-# 	out[1] = [a;]
-# 	if length(seq)==1
-# 		return out
-# 	end
-# 	done = false
-# 	while !done
-# 		done=next_permute!(a)
-# 		push!(out,[a;])
-# 	end
-# 	if out[end]==out[end-1]
-# 		out = out[1:end-1]
-# 	end
-# 	return out::Vector{Vector{Int}}
-# end
-#
-# function comb(D::Int,Q::Int)
-# 	if D ==1
-# 		return [Q]
-# 	end
-# 	Pq = Combinatorics.integer_partitions(Q)
-# 	out = Array(Vector{Int},0)
-#
-# 	for p in Pq
-# 		if length(p)==D
-# 			pPq=get_perms(p)
-# 			for j = 1:length(pPq)
-# 				push!(out,pPq[j])
-# 			end
-# 		end
-# 	end
-#
-# 	return out
-# end
+function subs!(x::Expr,s::Pair)
+    for i = 1:length(x.args)
+        if x.args[i]==s.first
+            x.args[i] = s.second
+        elseif isa(x.args[i],Expr)
+            subs!(x.args[i],s)
+        end
+    end
+end
+
+function subs!(x::Expr,list::Dict)
+    for i = 1:length(x.args)
+        if in(x.args[i],keys(list))
+            x.args[i] = list[x.args[i]]
+        elseif isa(x.args[i],Expr)
+            subs!(x.args[i],list)
+        end
+    end
+end
+
+
+function _threadsforfixed(fixed,iter,lbody)
+    fun = gensym("_threadsfor")
+    lidx = iter.args[1]         # index
+    range = iter.args[2]
+
+    svars = map(gensym,fixed.args)
+    newvar = quote end
+    for i = 1:length(fixed.args)
+        push!(newvar.args,:($(svars[i])=copy($(fixed.args[i]))))
+    end
+    subs!(lbody,Dict(zip(fixed.args,svars)))
+
+    quote
+        function $fun()
+            tid = threadid()
+            r = $(esc(range))
+            # divide loop iterations among threads
+            len, rem = divrem(length(r), nthreads())
+            # not enough iterations for all the threads?
+            if len == 0
+                if tid > rem
+                    return
+                end
+                len, rem = 1, 0
+            end
+            # compute this thread's iterations
+            f = 1 + ((tid-1) * len)
+            l = f + len - 1
+            # distribute remaining iterations evenly
+            if rem > 0
+                if tid <= rem
+                    f = f + (tid-1)
+                    l = l + tid
+                else
+                    f = f + rem
+                    l = l + rem
+                end
+            end
+            # run this thread's iterations
+
+            $(esc(quote
+            $newvar
+            end))
+            for i = f:l
+                local $(esc(lidx)) = Base.unsafe_getindex(r,i)
+                $(esc(lbody))
+            end
+        end
+        ccall(:jl_threading_run, Void, (Any,), Core.svec($fun))
+    end
+end
+
+
+import Base.Threads.@threads
+macro threads(args...)
+    na = length(args)
+    if na == 1
+        ex = args[1]
+        if !isa(ex, Expr)
+            throw(ArgumentError("need an expression argument to @threads"))
+        end
+        if is(ex.head, :for)
+            return Base.Threads._threadsfor(ex.args[1],ex.args[2])
+        else
+            throw(ArgumentError("unrecognized argument to @threads"))
+        end
+    elseif na==2
+        fixed = args[1]
+        ex = args[2]
+        if is(ex.head, :for)
+            return _threadsforfixed(fixed,ex.args[1],ex.args[2])
+        else
+            throw(ArgumentError("unrecognized argument to @threads"))
+        end
+    else
+        throw(ArgumentError("wrong number of arguments (1 or 2)"))
+    end
+end
+
 
 function comb(D::Int, Q::Int)
 	D==Q ? (return Vector{Int}[ones(Int,D)]) : nothing
