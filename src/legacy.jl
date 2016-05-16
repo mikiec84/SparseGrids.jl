@@ -196,3 +196,41 @@ function c_interp{D}(xi::Array{Float64},G::NGrid{D,Quadratic},A::Array{Float64,2
         length(G.L),maximum(G.L),size(G.grid,1),size(x,1),size(A,2),pointer(G.grid),pointer(G.level_M),pointer(w),pointer(x),pointer(y),pointer(G.nextid))
     return y
 end
+
+
+function jl_interpbig{D,BF}(G::NGrid{D,BF},A::Array{Float64,2},xi::Array{Float64})
+    bf = (BF == Linear ? cc_bf_l : cc_bf_q)
+    x 		= nXtoU(xi,G.bounds)
+    nc 		= size(G.covers,1)
+    nA      = size(A,2)
+    w 		= getW(G,A)
+    y 		= zeros(size(x,1),nA)
+    mL      = maximum(G.L)
+
+    for i = 1:size(x,1)
+        J 		= ones(Int,mL+1,D)
+        B 		= ones(mL+1,D)
+        id  	= zeros(Int,D)
+        for d = 1:D
+            for l = 1:mL+1
+                j 	= clamp(round(Int,x[i,d]*(cc_dM(l))+1/2),1,cc_dM(l))
+                B[l,d] 	= bf(x[i,d],cc_dg(l,j),Int16(cc_M(l)))
+                J[l,d]  = j
+            end
+        end
+
+        for ii = 1:nc
+            b  = B[G.covers[ii,D],D]*B[G.covers[ii,1],1]
+            id1 = J[G.covers[ii,D],D]-1
+            for d = D-1:-1:2
+                b*=B[G.covers[ii,d],d]
+                id1 = id1*G.covers_dM[ii,d]+(J[G.covers[ii,d],d]-1)
+            end
+            id1=(J[G.covers[ii,1],1]-1)+G.covers_dM[ii,1]*id1+1+G.covers_loc[ii]-1
+            for iii = 1:nA
+                y[i,iii]+=b*w[id1,iii]
+            end
+        end
+    end
+    y
+end
