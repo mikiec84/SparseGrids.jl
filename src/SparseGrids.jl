@@ -7,28 +7,21 @@ include("utils.jl")
 include("univariategrids.jl")
 include("grids.jl")
 include("jlfuncs.jl")
-# include("cfuncs.jl")
-include("api.jl")
-include("analyse.jl")
 include("adapt.jl")
-include("newinterp.jl")
+include("api.jl")
+
 
 precompile(NGrid,(Vector{Int},))
 
 
 
-export BasisFunction,
-	   Linear,
+export Linear,
        Quadratic,
-	   UnivariateGrid,
-	   GridType,
-	   CCGrid,
-	   CC,
-	   Max,
-       NGrid,
        getW,
        interp,
 	   level,
 	   shrink!,
-	   grow!
+	   grow!,
+	   @threads,
+       NGrid
 end

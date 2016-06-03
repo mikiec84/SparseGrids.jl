@@ -7,22 +7,22 @@ immutable NodeLocation
     l::UInt8
     j::UInt16
     dj::UInt16
-
 end
 NodeLocation(x::Float64) = NodeLocation(position(x)...)
 
 type AdaptiveGrid
     nodeinfo
     active::BitArray{1}
+    overlap::Vector{Vector{Bool}}
 end
 
 type NGrid{D,B}
     L::Vector{Int}
     bounds::Array{Float64,2}
     grid::Array{Float64,2}
-	covers::Array{Int16,2}
-    covers_dM::Array{Int16,2}
-	covers_loc::Vector{Int32}
+	covers::Array{UInt16,2}
+    covers_dM::Array{UInt16,2}
+	covers_loc::Vector{UInt16}
 
     adapt::AdaptiveGrid
 
@@ -69,38 +69,6 @@ function SmolyakSize(L::Vector{Int},mL::UnitRange{Int}=0:maximum(L))
     end
     return S
 end
-
-# function SmolyakGrid(L::Vector{Int},R,mL::UnitRange{Int}=0:maximum(L))
-#     D = length(L)
-#     g = Vector{Float64}[cc_g(l) for l = 1:maximum(L)+D]
-#     dw = Vector{Float64}[cc_dsimpsonsw(l) for l = 1:maximum(L)+D]
-#     G = Array(Array{Float64},0)
-#     W = Array(Array{Float64},0)
-#     index = Array(Array{Int},0)
-#     for l = mL
-#         for covering in comb(D,D+l)
-#             if all(covering.≤L+1)
-#                 push!(G,kron(g[covering]))
-#                 tw = dw[covering]
-#                 push!(W, vec(prod(kron(Vector{Float64}[tw[i]*R[i] for i = 1:D]),2)))
-#                 push!(index,repmat(covering',size(G[end],1)))
-#             end
-#         end
-#     end
-#     G = vcat(G...)::Array{Float64,2}
-#     W = vcat(W...)
-#     index = vcat(index...)::Array{Int,2}
-#
-#     uG = unique(G,1)
-#     uW = zeros(size(uG,1))
-#     uindex = zeros(Int16,size(uG))
-#     for i = 1:size(uG,1)
-#         ids = vec(all(G.==uG[i,:]',2))
-#         uW[i]=sum(W[ids])
-#         uindex[i,:]=index[findfirst(ids),:]
-#     end
-#     return uG,uindex,uW
-# end
 
 function SmolyakGrid(L::Vector{Int},mL::UnitRange{Int}=0:maximum(L))
     D = length(L)
@@ -149,26 +117,44 @@ function nextid(ind)
 end
 
 
+"""
+    NGrid(L,bounds,B)
 
+# Construction
+Construct a Smolyak grid.
+The vector of integers L determines the maximum level of the grid in each
+dimension. The bounds can be optionally changed from the default of [0,1]^D and
+basis function B can be either Linear or Quadratic.
+
+# Interpolation
+Grid objects are callable taking two arguments. The first is a vector containing
+function values at the grid nodes. The second array contains rows of points at
+which the interpolant is to be evaluated.
+"""
 function NGrid{BT<:BasisFunction}(L::Vector{Int},bounds::Array{Float64} = [0,1]*ones(1,length(L));B::Type{BT}=Linear)
     grid,ind=SmolyakGrid(L)
 	covers = map(UInt16,unique(ind,1))
     weights= zeros(size(grid,1))
     covers_dM = map(x->cc_dM(Int(x)),covers)
-    covers_loc = Int32[findfirst(all(covers[i:i,:].==ind,2)) for i = 1:size(covers,1)]
-	nid = nextid(ind)
+    covers_loc = zeros(UInt32,size(covers,1))
+    hind = [hash(ind[i,:]) for i = 1:size(ind,1)]
+    hcovers = [hash(covers[i,:]) for i = 1:size(covers,1)]
+    for i=1:size(covers,1)
+        covers_loc[i] = findfirst(hind,hcovers[i])
+    end
+
     G = NGrid{length(L),B}(L,
                         bounds,
                         grid,
                         covers,
                         covers_dM,
                         covers_loc,
-                        AdaptiveGrid([],zeros(Bool,size(grid,1))),
+                        AdaptiveGrid([],zeros(Bool,size(grid,1)),[]),
                         Vector{Int}[Int[] for i = 1:size(grid,1)],
                         Vector{Float64}[Float64[] for i = 1:size(grid,1)]
                         )
     G.adapt.active = (level(G).==maximum(level(G)))
-    buildW(G)
+    buildW(G,hind,hcovers)
     return G
 end
 

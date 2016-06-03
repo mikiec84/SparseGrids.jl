@@ -26,6 +26,10 @@ type CCGrid <:GridType end
     dx = (1.0-(mi-1.0)*abs(x-xij))
     return (dx>0.0) ? dx : 0.0
 end
+
+cc_bf_l(x::Float64,xij::Float64) = cc_bf_l(x,xij,cc_M(level(xij)))
+cc_bf_l(x::Vector{Float64},xij::Vector{Float64}) = prod(map(cc_bf_l,x,xij))
+
 @inline function cc_bf_q(x::Float64,xij::Float64,mi)
 	if (mi==1)
 		return 1.0
@@ -33,6 +37,9 @@ end
 	dx = 1.0-((mi-1.0)*(x-xij))^2
 	return (dx>0.0) ?  dx : 0.0
 end
+
+cc_bf_q(x::Float64,xij::Float64) = cc_bf_q(x,xij,cc_M(level(xij)))
+cc_bf_q(x::Vector{Float64},xij::Vector{Float64}) = map(cc_bf_q,x,xij)
 
 function cc_simpsonsw(i::Int,j::Int)
     @assert 1≤j≤CC.M(i)

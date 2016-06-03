@@ -1,7 +1,11 @@
-function buildW{D,BF}(G::NGrid{D,BF},pr=1:length(G))
+function buildW{D,BF}(G::NGrid{D,BF},hind,hcovers,pr=1:length(G))
     bf = (BF == Linear ? cc_bf_l : cc_bf_q)
     nc 		= size(G.covers,1)
-    coversid     = Int32[findfirst(all(map(level,G.grid[i:i,:]).== G.covers,2)) for i = 1:size(G.grid,1)]
+
+    coversid = zeros(Int32,length(G))
+    for i=1:length(hind)
+        coversid[i] = findfirst(hcovers,hind[i])
+    end
     mL      = maximum(G.L)
     J 		= ones(Int,mL+1,D)
     B 		= zeros(mL+1,D)

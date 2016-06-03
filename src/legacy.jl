@@ -234,3 +234,47 @@ function jl_interpbig{D,BF}(G::NGrid{D,BF},A::Array{Float64,2},xi::Array{Float64
     end
     y
 end
+
+
+function ainterp{D}(G::NGrid{D,Linear},A,x)
+   nG = length(G)
+   y = G(A,x)
+   w = getW(G,A)
+   dM = map(x->SparseGrids.cc_M(SparseGrids.level(x)),G.grid)
+   ns =(G.covers_loc[end]+prod(G.covers_dM[end,:]))
+   @threads for i = 1:length(y)
+       yi = 0.0
+       for j = ns:nG
+           b = 1.0
+           for d = 1:D
+               b *= SparseGrids.cc_bf_l(x[i,d],G.grid[j,d],dM[j,d])
+               b==0 && break
+           end
+           b>0 && (yi += w[j]*b)
+       end
+       y[i]+=yi
+   end
+   return y
+end
+
+
+function ainterp{D}(G::NGrid{D,Quadratic},A,x)
+   nG = length(G)
+   y = G(A,x)
+   w = getW(G,A)
+   dM = map(x->SparseGrids.cc_M(SparseGrids.level(x)),G.grid)
+   ns =(G.covers_loc[end]+prod(G.covers_dM[end,:]))
+   @threads for i = 1:length(y)
+       yi = 0.0
+       for j = ns:nG
+           b = 1.0
+           for d = 1:D
+               b *= SparseGrids.cc_bf_q(x[i,d],G.grid[j,d],dM[j,d])
+               b==0 && break
+           end
+           b>0 && (yi += w[j]*b)
+       end
+       y[i]+=yi
+   end
+   return y
+end

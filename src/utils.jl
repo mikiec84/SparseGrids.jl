@@ -49,29 +49,6 @@ function nXtoU(X::Array{Float64,2},bnds1::Array{Float64,2})
 	return out
 end
 
-function hsh(x::Vector{Int})
-	h = x[1]*17
-	for i = 2:length(x)
-		h+=x[i]
-		h*=17
-	end
-	h
-end
-
-function hsh(x::Array{Int,2})
-	D = size(x,2)
-	H = zeros(Int,size(x,1))
-	for i = 1:size(x,1)
-		H[i] = x[i,1]*17
-		for j = 2:D
-			H[i] += x[i,j]
-			H[i] *= 17
-		end
-	end
-	return H
-end
-
-
 function subs!(x::Expr,s::Pair)
     for i = 1:length(x.args)
         if x.args[i]==s.first
@@ -88,6 +65,16 @@ function subs!(x::Expr,list::Dict)
             x.args[i] = list[x.args[i]]
         elseif isa(x.args[i],Expr)
             subs!(x.args[i],list)
+        end
+    end
+end
+
+function remlineinfo!(x)
+    if isa(x,Expr)
+        id = find(map(x->isa(x,Expr) && x.head==:line,x.args))
+        deleteat!(x.args,id)
+        for j in x.args
+            remlineinfo!(j)
         end
     end
 end
@@ -230,3 +217,37 @@ function ndgrid{T}(vs::AbstractVector{T}...)
     end
     out
 end
+
+
+function position(x::Float64)
+    l=0
+    if x==0.5
+        l =  1
+    elseif x==0.0 || x==1.0
+        l = 2
+    else
+        for l = 3:12
+            mod(x,1/2^(l-1))==0.0 && break
+        end
+    end
+    j = 0
+    dj = 0
+    if l==1
+        j = 1
+        dj = 1
+    elseif l==2
+        if x==0.0
+            j = 1
+            dj = 1
+        elseif x==1.0
+            j = 3
+            dj = 2
+        end
+    else
+        j = Int(div(x,1/2^(l-1))+1)
+        dj = div(j-1,2)+1
+    end
+    return l,j,dj
+end
+
+findrow{T}(X::Array{T,2},x::Vector{T}) = findfirst(mapslices(hash,X,2),hash(x))
