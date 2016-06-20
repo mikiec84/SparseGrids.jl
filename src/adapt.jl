@@ -3,7 +3,7 @@ function addcover!{D,B}(G::NGrid{D,B},L::Vector{Int})
     bf = B==Linear ? cc_bf_l : cc_bf_q
     x   = kron([SparseGrids.cc_dg(i) for i in L])
     ind = repmat(map(Int16,L'),size(x,1))
-    level_M = map(i->Int16(SparseGrids.cc_M(level(i))),G.grid)
+    level_M = map(i->Int16(SparseGrids.M(level(i))),G.grid)
 
     for id = 1:size(x,1)
         push!(G.Bs,[])
@@ -24,7 +24,7 @@ function addcover!{D,B}(G::NGrid{D,B},L::Vector{Int})
 
     G.covers = [G.covers;L']
     G.covers_loc = Int32[findfirst(all(G.covers[i:i,:].==ind,2)) for i = 1:size(G.covers,1)]
-    G.covers_dM = map(x->SparseGrids.cc_dM(Int(x)),G.covers)
+    G.covers_dM = map(x->SparseGrids.dM(Int(x)),G.covers)
     G.adapt.active = [G.adapt.active;zeros(Bool,size(x,1))]
     G.L = vec(maximum(G.covers,1))-1
     return
@@ -44,7 +44,7 @@ function Base.sort!(G::NGrid)
         G.grid = G.grid[id,:]
         ind = map(level,G.grid)
         G.covers = map(UInt16,unique(ind,1))
-        G.covers_dM = map(x->cc_dM(Int(x)),G.covers)
+        G.covers_dM = map(x->dM(Int(x)),G.covers)
         G.covers_loc = Int32[findfirst(all(G.covers[i:i,:].==ind,2)) for i = 1:size(G.covers,1)]
         SparseGrids.buildW(G)
     end
@@ -61,7 +61,7 @@ function iscoverfull(G::NGrid,L::Vector{Int})
         end
         b && (n+=1)
     end
-    return n == prod(map(cc_dM,L))
+    return n == prod(map(dM,L))
 end
 
 looseid(G::NGrid) = G.covers_loc[end]+prod(G.covers_dM[end,:]):size(G.grid,1)
@@ -125,7 +125,7 @@ end
 
 function rebuildW{D,BF}(G::NGrid{D,BF},idr)
     bf = (BF==Linear ? cc_bf_l : cc_bf_q)
-    level_M = map(i->Int16(SparseGrids.cc_M(level(i))),G.grid)
+    level_M = map(i->Int16(SparseGrids.M(level(i))),G.grid)
     for j = idr
         G.Bs[j] = Float64[]
         G.IDs[j] = Int[]
@@ -215,9 +215,9 @@ for b in [(Linear,Lbj,cc_bf_l),(Quadratic,Qbj,cc_bf_q)]
             mL      = maximum(G.L)+1
             J         = zeros(Int,mL,$D)
             B         = ones(mL,$D)
-            dM = map(x->cc_M(level(x)),G.grid)
+            dM = map(x->M(level(x)),G.grid)
 
-            @threads [J,B] for i = 1:nx
+            @threadsfixed [J,B] for i = 1:nx
                 $(b[2])
                 yi = 0.0
                 coverloop
@@ -283,10 +283,10 @@ for b in [(Linear,Lbj,cc_bf_l),(Quadratic,Qbj,cc_bf_q)]
             mL      = maximum(G.L)+1
             J         = zeros(Int,mL,$D)
             B         = ones(mL,$D)
-            dM = map(x->cc_M(level(x)),G.grid)
+            dM = map(x->M(level(x)),G.grid)
             yi = zeros(nA)
 
-            @threads [J,B,yi] for i = 1:nx
+            @threadsfixed [J,B,yi] for i = 1:nx
                 $(b[2])
                 coverloop
 

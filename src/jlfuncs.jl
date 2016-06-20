@@ -1,3 +1,9 @@
+
+"""
+    buildW(G,hind,hcovers,pr)
+
+Precomputes
+"""
 function buildW{D,BF}(G::NGrid{D,BF},hind,hcovers,pr=1:length(G))
     bf = (BF == Linear ? cc_bf_l : cc_bf_q)
     nc 		= size(G.covers,1)
@@ -14,8 +20,8 @@ function buildW{D,BF}(G::NGrid{D,BF},hind,hcovers,pr=1:length(G))
         G.Bs[i] = Float64[]
         for d = 1:D
             for l = 1:mL+1
-                j 	= clamp(round(Int,G.grid[i,d]*(cc_dM(l))+1/2),1,cc_dM(l))
-                B[l,d] 	= bf(G.grid[i,d],cc_dg(l,j),Int16(cc_M(l)))
+                j 	= clamp(round(Int,G.grid[i,d]*(dM(l))+1/2),1,dM(l))
+                B[l,d] 	= bf(G.grid[i,d],cc_dg(l,j),Int16(M(l)))
                 J[l,d]  = j
             end
         end
@@ -67,7 +73,6 @@ end
         j 	= clamp(round(Int,x[i,d]*dm+1/2),1,dm)
         xij = (2j-1)/m
         dx = 1.0-(m*(x[i,d]-xij))^2
-        # B[l,d] 	= (dx>0.0) ? dx : 0.0
         B[l,d] 	= dx
         J[l,d]  = j-1
     end
@@ -99,10 +104,19 @@ for b in [(Linear,Lbj),(Quadratic,Qbj)]
             J         = zeros(Int,mL,$D)
             B         = ones(mL,$D)
 
-            @threads [J,B] for i = 1:nx
+            @threadsfixed [J,B] for i = 1:nx
                 $(b[2])
                 yi = 0.0
-                coverloop
+                @inbounds for ii in nc
+                    $(Expr(:block,
+                        :(b   = B[G.covers[ii,$D],$D]*B[G.covers[ii,1],1]),
+                        (:(b  *= B[G.covers[ii,$d],$d]) for d in D-1:-1:2)...,
+                        :(id1 = J[G.covers[ii,$D],$D]),
+                        (:(id1 = id1*G.covers_dM[ii,$d]+J[G.covers[ii,$d],$d]) for d in D-1:-1:2)...,
+                        :(id1 = id1*G.covers_dM[ii,1]+G.covers_loc[ii]+J[G.covers[ii,1],1]),
+                        :(yi += b*w[id1])
+                        ))
+                end
                 y[i] = yi
             end
             y
@@ -141,7 +155,6 @@ for b in [(Linear,Lbj),(Quadratic,Qbj)]
                 x         = nXtoU(xi,G.bounds)
                 nx        = size(x,1)
 
-                # y         = zeros(Float64,nx,$adim)
                 nc         = 1:size(G.covers,1)
                 dr1 = 1:$D
                 mL      = maximum(G.L)+1
@@ -149,7 +162,7 @@ for b in [(Linear,Lbj),(Quadratic,Qbj)]
                 B         = ones(mL,$D)
                 yi        = zeros($adim)
 
-                @threads [J,B,yi] for i = 1:nx
+                @threadsfixed [J,B,yi] for i = 1:nx
                     $(b[2])
                     coverloop
                 end
@@ -165,28 +178,23 @@ end
 jl_interp(G::NGrid,A::Array{Float64,2},x::Array{Float64,2},y=zeros(size(x,1),size(A,2))) = jl_interp(G,A,x,dimdef{size(A,2)}(),y)
 
 
-
-
-
-
-
-function jl_getWbig(G::NGrid,A::Vector{Float64})
+function getW(G::NGrid,A::Vector{Float64})
     w = copy(A)
     for i = 1:length(G)
         for l ∈ 1:length(G.Bs[i])-1
-            w[i]+=  G.Bs[i][l]*w[G.IDs[i][l]]
+            @inbounds w[i]+=  G.Bs[i][l]*w[G.IDs[i][l]]
         end
     end
     return w
 end
 
-function jl_getWbig(G::NGrid,A::Array{Float64,2})
+function getW(G::NGrid,A::Array{Float64,2})
     nA = size(A,2)
     w = copy(A)
     for i = 1:length(G)
         for l ∈ 1:length(G.Bs[i])-1
             for a = 1:nA
-                w[i,a]+=  G.Bs[i][l]*w[G.IDs[i][l],a]
+                @inbounds w[i,a]+=  G.Bs[i][l]*w[G.IDs[i][l],a]
             end
         end
     end

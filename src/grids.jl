@@ -30,6 +30,8 @@ type NGrid{D,B}
     Bs::Vector{Vector{Float64}}
 end
 
+
+# Returns the tensor grid of a vector of univariate grids
 function Base.kron(X::Vector{Vector{Float64}})
     D = length(X)
     lxs = Int[length(x) for x in X]
@@ -47,14 +49,26 @@ end
 
 Base.kron(x::Vector{Float64}) = x
 
+"""
+    TensorGrid(L)
+
+Returns a tensor grid of univariate grids of levels given by L = [l1,l2,...]
+"""
 function TensorGrid(L::Vector{Int})
     G = ndgrid(Vector{Float64}[cc_g(i) for i in L]...)
     G = hcat([vec(g) for g in G]...)
 end
 
+
+"""
+    SmolyakSize(L[, mL])
+
+Returns the number of nodes in levels mL of a Smolyak grid of maximum
+of maximum level L = [l1,l2...]
+"""
 function SmolyakSize(L::Vector{Int},mL::UnitRange{Int}=0:maximum(L))
     D = length(L)
-    m = Int[cc_dM(l) for l = 1:maximum(L)+D]
+    m = Int[dM(l) for l = 1:maximum(L)+D]
     S = 0
     for l = mL
         for covering in comb(D,D+l)
@@ -70,6 +84,12 @@ function SmolyakSize(L::Vector{Int},mL::UnitRange{Int}=0:maximum(L))
     return S
 end
 
+
+"""
+    SmolyakGrid(L[, mL])
+
+ juli
+"""
 function SmolyakGrid(L::Vector{Int},mL::UnitRange{Int}=0:maximum(L))
     D = length(L)
     dg = Vector{Float64}[cc_dg(l) for l = 1:maximum(L)+D]
@@ -88,6 +108,11 @@ function SmolyakGrid(L::Vector{Int},mL::UnitRange{Int}=0:maximum(L))
     return G,index
 end
 
+"""
+    level(x)
+
+Computes the minimum level of a point
+"""
 function level(x::Float64)
     l=0
     if x==0.5
@@ -103,18 +128,6 @@ function level(x::Float64)
 end
 level(G::NGrid) = level(G.grid)
 level(X::Array{Float64}) = vec(sum(map(level,X),2)-size(X,2))
-
-
-level_loc(lev::Vector) = [Int32[findfirst(lev.==l) for l = 0:maximum(lev)];Int32(length(lev)+1)]::Vector{Int32}
-
-function nextid(ind)
-    C = unique(ind,1)
-    Cl = Vector{Int}[(1:size(ind,1))[vec(all(ind.==C[i,:]',2))] for i = 1:size(C,1)]
-    itoCi = [findfirst([in(i,c) for c in Cl]) for i = 1:size(ind,1)]
-    nextid=Int32[findfirst(itoCi.>itoCi[i]) for i = 1:size(ind,1)]
-    nextid[nextid.==0]=(size(ind,1)+1)
-    return nextid
-end
 
 
 """
@@ -133,12 +146,10 @@ which the interpolant is to be evaluated.
 """
 function NGrid{BT<:BasisFunction}(L::Vector{Int},bounds::Array{Float64} = [0,1]*ones(1,length(L));B::Type{BT}=Linear)
     grid,ind=SmolyakGrid(L)
-	covers = map(UInt16,unique(ind,1))
-    weights= zeros(size(grid,1))
-    covers_dM = map(x->cc_dM(Int(x)),covers)
+	covers = UInt16.(unique(ind,1))
     covers_loc = zeros(UInt32,size(covers,1))
-    hind = [hash(ind[i,:]) for i = 1:size(ind,1)]
-    hcovers = [hash(covers[i,:]) for i = 1:size(covers,1)]
+    hind = vec(mapslices(hash,ind,2))
+    hcovers = vec(mapslices(hash,covers,2))
     for i=1:size(covers,1)
         covers_loc[i] = findfirst(hind,hcovers[i])
     end
@@ -147,7 +158,7 @@ function NGrid{BT<:BasisFunction}(L::Vector{Int},bounds::Array{Float64} = [0,1]*
                         bounds,
                         grid,
                         covers,
-                        covers_dM,
+                        dM.(covers),
                         covers_loc,
                         AdaptiveGrid([],zeros(Bool,size(grid,1)),[]),
                         Vector{Int}[Int[] for i = 1:size(grid,1)],
@@ -163,5 +174,5 @@ Base.length(G::NGrid) = size(G.grid,1)
 Base.size(G::NGrid) = size(G.grid)
 Base.values(G::NGrid) = nUtoX(G.grid,G.bounds)
 
-# Base.getindex(G::NGrid,args...) = getindex(G.grid,args...)
+
 Base.getindex(G::NGrid,args...) = getindex(G.grid,args...)

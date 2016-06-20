@@ -1,64 +1,36 @@
-
-function XtoX(X::Array{Float64,1},bnds1::Array{Float64,1},bnds2::Array{Float64,1})
-	lb1 = minimum(bnds1)
-	ub1 = maximum(bnds1)
-	lb2 = minimum(bnds2)
-	ub2 = maximum(bnds2)
-	out = Array(Float64,length(X))
-	for i = 1:length(X)
-		out[i] = (X[i]-lb1)/(ub1-lb1)*(ub2-lb2)+lb2
-	end
-	return out
-end
-
-function nXtoX(X::Array{Float64,2},bnds1::Array{Float64,2},bnds2::Array{Float64,2})
+function nXtoU(X::Array{Float64,2},bnds::Array{Float64,2})
 	N,R = size(X)
 	out = Array(Float64,size(X))
 	for r = 1:R
-		lb1 = minimum(bnds1[:,r])
-		ub1 = maximum(bnds1[:,r])
-		lb2 = minimum(bnds2[:,r])
-		ub2 = maximum(bnds2[:,r])
-		for i = 1:N
-			out[i,r] = (X[i,r]-lb1)/(ub1-lb1)*(ub2-lb2)+lb2
-		end
-	end
-	return out
-end
-nXtoX(X::Array{Float64,1},bnds1::Array{Float64,2},bnds2::Array{Float64,2})=XtoX(X,bnds1[:],bnds2[:])
-
-UtoX(U::Array{Float64,1},bnds::Array{Float64,1}) = XtoX(U,[0.0,1.0],bnds)
-XtoU(X::Array{Float64,1},bnds::Array{Float64,1}) = XtoX(X,bnds,[0.0,1.0])
-
-nUtoX(U::Array{Float64,2},bnds::Array{Float64,2}) = nXtoX(U,[zeros(1,size(U,2));ones(1,size(U,2))],bnds)
-# nXtoU(X::Array{Float64,2},bnds::Array{Float64,2}) = nXtoX(X,bnds,[zeros(1,size(X,2));ones(1,size(X,2))])
-nXtoU(X::Array{Float64,1},bnds::Array{Float64,2}) = XtoX(X,bnds[:],[0.0,1.0])
-nUtoX(U::Array{Float64,1},bnds::Array{Float64,2}) = XtoX(U,[0.0,1.0],bnds[:])
-
-
-function nXtoU(X::Array{Float64,2},bnds1::Array{Float64,2})
-	N,R = size(X)
-	out = Array(Float64,size(X))
-	for r = 1:R
-		lb1 = minimum(bnds1[:,r])
-		ub1 = maximum(bnds1[:,r])
+		lb = bnds[1,r]
+		ub = bnds[2,r]
 		@inbounds for i = 1:N
-			out[i,r] = (X[i,r]-lb1)/(ub1-lb1)
+			out[i,r] = (X[i,r]-lb)/(ub-lb)
 		end
 	end
 	return out
 end
 
-function subs!(x::Expr,s::Pair)
-    for i = 1:length(x.args)
-        if x.args[i]==s.first
-            x.args[i] = s.second
-        elseif isa(x.args[i],Expr)
-            subs!(x.args[i],s)
-        end
-    end
+function nUtoX(X::Array{Float64,2},bnds::Array{Float64,2})
+	N,R = size(X)
+	out = Array(Float64,size(X))
+	for r = 1:R
+		lb = bnds[1,r]
+		ub = bnds[2,r]
+		@inbounds for i = 1:N
+			out[i,r] = X[i,r]*(ub-lb)+lb
+		end
+	end
+	return out
 end
 
+
+
+"""
+    subs!(x,list)
+
+Substitute variables in an expression.
+"""
 function subs!(x::Expr,list::Dict)
     for i = 1:length(x.args)
         if in(x.args[i],keys(list))
@@ -68,6 +40,8 @@ function subs!(x::Expr,list::Dict)
         end
     end
 end
+
+subs!(x::Expr,p::Pair) = subs!(x,Dict(p))
 
 function remlineinfo!(x)
     if isa(x,Expr)
@@ -79,7 +53,11 @@ function remlineinfo!(x)
     end
 end
 
-
+# This alters Base.Threads.@threads to allow for individual copies of
+# variables across a parallel loop:
+# @threads [a,b...] for i = 1:...
+# creates copies of a,b... before the parallel loop starts thus avoiding
+# the need for multiple allocations
 function _threadsforfixed(fixed,iter,lbody)
     fun = gensym("_threadsfor")
     lidx = iter.args[1]         # index
@@ -133,8 +111,8 @@ function _threadsforfixed(fixed,iter,lbody)
 end
 
 
-import Base.Threads.@threads
-macro threads(args...)
+# import Base.Threads.@threads
+macro threadsfixed(args...)
     na = length(args)
     if na == 1
         ex = args[1]
@@ -160,6 +138,14 @@ macro threads(args...)
 end
 
 
+
+"""
+    comb(D,Q)
+
+Generates a vector of  vectors containing D integers
+that sum up to Q. The result is returned in decreasing
+lexicographic order.
+"""
 function comb(D::Int, Q::Int)
 	D==Q ? (return Vector{Int}[ones(Int,D)]) : nothing
 	L = Q - D + 1
@@ -187,7 +173,12 @@ function comb(D::Int, Q::Int)
 	return out
 end
 
+"""
+    ndgrid(v...)
 
+Computes the tensor grid of d input vectors and returns d
+d-dimensional arrays.
+"""
 ndgrid(v::AbstractVector) = (copy(v),)
 
 function ndgrid{T}(v1::AbstractVector{T}, v2::AbstractVector{T})
@@ -218,8 +209,11 @@ function ndgrid{T}(vs::AbstractVector{T}...)
     out
 end
 
-
-function position(x::Float64)
+# Returns a tuple (l,j,dj) for any given point where
+# l is the minimum level of grid to which it belongs,
+# j is the index in this grid and dj the index in the
+# difference grid.
+function Base.position(x::Float64)
     l=0
     if x==0.5
         l =  1
