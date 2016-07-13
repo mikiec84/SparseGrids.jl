@@ -29,12 +29,12 @@ cc_bf_q(x::Float64,xij::Float64) = cc_bf_q(x,xij,cc_M(level(xij)))
 cc_bf_q(x::Vector{Float64},xij::Vector{Float64}) = map(cc_bf_q,x,xij)
 
 function cc_simpsonsw(i::Int,j::Int)
-    @assert 1≤j≤CC.M(i)
+    @assert 1≤j≤M(i)
     if i==1
         return 1.0
     end
-    w = 1/(CC.M(i)-1)/3
-    if j==1 || j==CC.M(i)
+    w = 1/(M(i)-1)/3
+    if j==1 || j==M(i)
         return w
     else
         w*= mod(j,2)==0 ? 4 : 2
@@ -42,7 +42,7 @@ function cc_simpsonsw(i::Int,j::Int)
     return w
 end
 
-cc_simpsonsw(i::Int) = Float64[cc_simpsonsw(i,j) for j = 1:CC.M(i)]
+cc_simpsonsw(i::Int) = Float64[cc_simpsonsw(i,j) for j = 1:M(i)]
 
 function cc_dsimpsonsw(i::Int)
     if i==1
@@ -50,6 +50,6 @@ function cc_dsimpsonsw(i::Int)
     elseif i==2
         return cc_simpsonsw(i)-[0;1.0;0]
     else
-        return cc_simpsonsw(i)-vec(Float64[cc_simpsonsw(i-1)';zeros(1,CC.M(i-1))])[1:2CC.M(i-1)-1]
+        return cc_simpsonsw(i)-vec(Float64[cc_simpsonsw(i-1)';zeros(1,M(i-1))])[1:M(i-1)-1]
     end
 end

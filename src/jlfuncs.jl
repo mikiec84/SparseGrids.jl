@@ -1,4 +1,3 @@
-
 """
     buildW(G,hind,hcovers,pr)
 
@@ -43,6 +42,7 @@ function buildW{D,BF}(G::NGrid{D,BF},hind,hcovers,pr=1:length(G))
 end
 
 
+# This section constructs specialised functions for grids of dimensions 2-12
 Lbj = quote
 @inbounds for d in dr1
     J[2,d] = (x[i,d]>0.5)
@@ -94,7 +94,7 @@ for b in [(Linear,Lbj),(Quadratic,Qbj)]
 
         push!(coverloop.args[2].args[2].args,:(id1 = id1*G.covers_dM[ii,1]+G.covers_loc[ii]+J[G.covers[ii,1],1];yi += b*w[id1]))
 
-        f=:(function jl_interp(G::NGrid{$D,$(b[1])},A::Vector{Float64},xi::Array{Float64,2},y = zeros(Float64,size(xi,1)))
+        f=:(function interpolate(G::NGrid{$D,$(b[1])},A::Vector{Float64},xi::Array{Float64,2},y = zeros(Float64,size(xi,1)))
             w         = getW(G,A)
             x         = nXtoU(xi,G.bounds)
             nx        = size(x,1)
@@ -150,7 +150,7 @@ for b in [(Linear,Lbj),(Quadratic,Qbj)]
                 push!(coverloop.args,:(@inbounds y[i,$d]=yi[$d]))
             end
 
-            f=:(function jl_interp(G::NGrid{$D,$(b[1])},A::Array{Float64,2},xi::Array{Float64,2},nA::dimdef{$adim},y::Array{Float64,2})
+            f=:(function interpolate(G::NGrid{$D,$(b[1])},A::Array{Float64,2},xi::Array{Float64,2},nA::dimdef{$adim},y::Array{Float64,2})
                 w         = getW(G,A)
                 x         = nXtoU(xi,G.bounds)
                 nx        = size(x,1)
@@ -175,7 +175,7 @@ for b in [(Linear,Lbj),(Quadratic,Qbj)]
     end
 end
 
-jl_interp(G::NGrid,A::Array{Float64,2},x::Array{Float64,2},y=zeros(size(x,1),size(A,2))) = jl_interp(G,A,x,dimdef{size(A,2)}(),y)
+interpolate(G::NGrid,A::Array{Float64,2},x::Array{Float64,2},y=zeros(size(x,1),size(A,2))) = interpolate(G,A,x,dimdef{size(A,2)}(),y)
 
 
 function getW(G::NGrid,A::Vector{Float64})

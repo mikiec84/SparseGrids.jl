@@ -45,7 +45,7 @@ subs!(x::Expr,p::Pair) = subs!(x,Dict(p))
 
 function remlineinfo!(x)
     if isa(x,Expr)
-        id = find(map(x->isa(x,Expr) && x.head==:line,x.args))
+        id = find(map(y->isa(y,Expr) && y.head==:line,x.args))
         deleteat!(x.args,id)
         for j in x.args
             remlineinfo!(j)

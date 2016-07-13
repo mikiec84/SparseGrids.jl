@@ -283,7 +283,7 @@ for b in [(Linear,Lbj,cc_bf_l),(Quadratic,Qbj,cc_bf_q)]
             mL      = maximum(G.L)+1
             J         = zeros(Int,mL,$D)
             B         = ones(mL,$D)
-            dM = map(x->M(level(x)),G.grid)
+            dM = map(xij->M(level(xij)),G.grid)
             yi = zeros(nA)
 
             @threadsfixed [J,B,yi] for i = 1:nx

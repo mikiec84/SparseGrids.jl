@@ -103,9 +103,10 @@ function SmolyakGrid(L::Vector{Int},mL::UnitRange{Int}=0:maximum(L))
             end
         end
     end
-    G = vcat(G...)::Array{Float64,2}
-    index = vcat(index...)::Array{Int,2}
-    return G,index
+    # G = vcat(G...)::Array{Float64,2}
+    # index = vcat(index...)::Array{Int,2}
+    # return G,index
+    return (vcat(G...),vcat(index...))::Tuple{Array{Float64,2},Array{Int,2}}
 end
 
 """
@@ -169,7 +170,7 @@ function NGrid{BT<:BasisFunction}(L::Vector{Int},bounds::Array{Float64} = [0,1]*
     return G
 end
 
-Base.show(io::IO,G::NGrid) = println(typeof(G),": $(size(G.grid,1))pts")
+Base.show(io::IO,G::NGrid) = println(io,typeof(G),": $(size(G.grid,1))pts")
 Base.length(G::NGrid) = size(G.grid,1)
 Base.size(G::NGrid) = size(G.grid)
 Base.values(G::NGrid) = nUtoX(G.grid,G.bounds)
