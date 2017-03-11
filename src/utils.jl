@@ -213,7 +213,7 @@ end
 # l is the minimum level of grid to which it belongs,
 # j is the index in this grid and dj the index in the
 # difference grid.
-function Base.position(x::Float64)
+function position(x::Float64)
     l=0
     if x==0.5
         l =  1

@@ -1,7 +1,6 @@
 abstract BasisFunction
 abstract Linear  <: BasisFunction
 abstract Quadratic <: BasisFunction
-abstract GaussianRadialBF <: BasisFunction
 
 immutable NodeLocation
     l::UInt8

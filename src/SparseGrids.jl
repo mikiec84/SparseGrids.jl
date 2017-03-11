@@ -1,6 +1,5 @@
 __precompile__()
 module SparseGrids
-#using Combinatorics,Base.Threads
 using Base.Threads
 include("utils.jl")
 include("univariategrids.jl")
