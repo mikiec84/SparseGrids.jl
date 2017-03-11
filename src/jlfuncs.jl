@@ -73,7 +73,7 @@ end
         j 	= clamp(round(Int,x[i,d]*dm+1/2),1,dm)
         xij = (2j-1)/m
         dx = 1.0-(m*(x[i,d]-xij))^2
-        B[l,d] 	= dx
+        B[l,d]  = dx
         J[l,d]  = j-1
     end
 end
@@ -82,7 +82,7 @@ end
 
 
 for b in [(Linear,Lbj),(Quadratic,Qbj)]
-    for D = 2:12
+    for D = 2:20
         coverloop = :(@inbounds for ii in nc
             b   = B[G.covers[ii,$D],$D]*B[G.covers[ii,1],1]
             id1 = J[G.covers[ii,$D],$D]
@@ -98,7 +98,7 @@ for b in [(Linear,Lbj),(Quadratic,Qbj)]
             w         = getW(G,A)
             x         = nXtoU(xi,G.bounds)
             nx        = size(x,1)
-            nc         = 1:size(G.covers,1)
+            cr         = 1:size(G.covers,1)
             dr1 = 1:$D
             mL      = maximum(G.L)+1
             J         = zeros(Int,mL,$D)
@@ -107,7 +107,7 @@ for b in [(Linear,Lbj),(Quadratic,Qbj)]
             @threadsfixed [J,B] for i = 1:nx
                 $(b[2])
                 yi = 0.0
-                @inbounds for ii in nc
+                @inbounds for ii in cr
                     $(Expr(:block,
                         :(b   = B[G.covers[ii,$D],$D]*B[G.covers[ii,1],1]),
                         (:(b  *= B[G.covers[ii,$d],$d]) for d in D-1:-1:2)...,

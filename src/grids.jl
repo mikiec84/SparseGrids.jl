@@ -145,7 +145,7 @@ Grid objects are callable taking two arguments. The first is a vector containing
 function values at the grid nodes. The second array contains rows of points at
 which the interpolant is to be evaluated.
 """
-function NGrid{BT<:BasisFunction}(L::Vector{Int},bounds::Array{Float64} = [0,1]*ones(1,length(L));B::Type{BT}=Linear)
+function NGrid{BT<:BasisFunction}(L::Vector{Int},bounds::Array{Float64} = [0,1].*ones(1,length(L));B::Type{BT}=Linear)
     grid,ind=SmolyakGrid(L)
 	covers = UInt16.(unique(ind,1))
     covers_loc = zeros(UInt32,size(covers,1))

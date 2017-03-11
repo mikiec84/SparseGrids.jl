@@ -127,7 +127,7 @@ macro threadsfixed(args...)
     elseif na==2
         fixed = args[1]
         ex = args[2]
-        if is(ex.head, :for)
+        if ex.head === :for
             return _threadsforfixed(fixed,ex.args[1],ex.args[2])
         else
             throw(ArgumentError("unrecognized argument to @threads"))
