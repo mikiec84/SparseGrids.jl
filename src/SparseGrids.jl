@@ -11,8 +11,8 @@ include("api.jl")
 export Linear, Quadratic,
        getW,
        interpolate,
-	   level,
-	   grow!,
-	   @threads,
+       level,
+       grow!,
+       @threads,
        NGrid
 end
