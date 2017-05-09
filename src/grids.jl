@@ -1,27 +1,27 @@
-abstract BasisFunction
-abstract Linear  <: BasisFunction
-abstract Quadratic <: BasisFunction
+abstract type BasisFunction end
+abstract type Linear  <: BasisFunction end
+abstract type Quadratic <: BasisFunction end
 
-immutable NodeLocation
+struct NodeLocation
     l::UInt8
     j::UInt16
     dj::UInt16
 end
 NodeLocation(x::Float64) = NodeLocation(position(x)...)
 
-type AdaptiveGrid
+mutable struct AdaptiveGrid
     nodeinfo
     active::BitArray{1}
     overlap::Vector{Vector{Bool}}
 end
 
-type NGrid{D,B}
+mutable struct NGrid{D, B}
     L::Vector{Int}
-    bounds::Array{Float64,2}
-    grid::Array{Float64,2}
-	covers::Array{UInt16,2}
-    covers_dM::Array{UInt16,2}
-	covers_loc::Vector{UInt16}
+    bounds::Array{Float64, 2}
+    grid::Array{Float64, 2}
+	   covers::Array{UInt16, 2}
+    covers_dM::Array{UInt16, 2}
+	   covers_loc::Vector{UInt16}
 
     adapt::AdaptiveGrid
 
@@ -34,12 +34,12 @@ end
 function Base.kron(X::Vector{Vector{Float64}})
     D = length(X)
     lxs = Int[length(x) for x in X]
-    G = zeros(prod(lxs),D)
-    s=1
-    for d=1:D
-        snext = s*lxs[d]
+    G = zeros(prod(lxs), D)
+    s = 1
+    for d = 1:D
+        snext = s * lxs[d]
         for j = 1:prod(lxs)
-            G[j,d] = X[d][div(rem(j-1, snext), s)+1]
+            G[j, d] = X[d][div(rem(j - 1, snext), s) + 1]
         end
         s = snext
     end
@@ -65,18 +65,18 @@ end
 Returns the number of nodes in levels mL of a Smolyak grid of maximum
 of maximum level L = [l1,l2...]
 """
-function SmolyakSize(L::Vector{Int},mL::UnitRange{Int}=0:maximum(L))
+function SmolyakSize(L::Vector{Int}, mL::UnitRange{Int} = 0:maximum(L))
     D = length(L)
-    m = Int[dM(l) for l = 1:maximum(L)+D]
+    m = Int[dM(l) for l = 1:maximum(L) + D]
     S = 0
     for l = mL
-        for covering in comb(D,D+l)
-            if all(covering.≤L+1)
-                s=m[covering[1]]
+        for covering in comb(D, D + l)
+            if all(covering .≤ L + 1)
+                s = m[covering[1]]
                 for i = 2:length(covering)
-                    s*=m[covering[i]]
+                    s *= m[covering[i]]
                 end
-                S+=s
+                S += s
             end
         end
     end
@@ -89,23 +89,23 @@ end
 
  juli
 """
-function SmolyakGrid(L::Vector{Int},mL::UnitRange{Int}=0:maximum(L))
+function SmolyakGrid(L::Vector{Int}, mL::UnitRange{Int} = 0:maximum(L))
     D = length(L)
-    dg = Vector{Float64}[cc_dg(l) for l = 1:maximum(L)+D]
-    G = Array(Array{Float64},0)
-    index = Array(Array{Int},0)
+    dg = Vector{Float64}[cc_dg(l) for l = 1:maximum(L) + D]
+    G = Array{Array{Float64}}(0)
+    index = Array{Array{Int}}(0)
     for l = mL
-        for covering in comb(D,D+l)
-            if all(covering.≤L+1)
-                push!(G,kron(dg[covering]))
-                push!(index,repmat(covering',size(G[end],1)))
+        for covering in comb(D, D + l)
+            if all(covering .≤ L + 1)
+                push!(G, kron(dg[covering]))
+                push!(index, repmat(covering', size(G[end], 1)))
             end
         end
     end
     # G = vcat(G...)::Array{Float64,2}
     # index = vcat(index...)::Array{Int,2}
     # return G,index
-    return (vcat(G...),vcat(index...))::Tuple{Array{Float64,2},Array{Int,2}}
+    return (vcat(G...), vcat(index...))::Tuple{Array{Float64, 2}, Array{Int, 2}}
 end
 
 """
@@ -114,20 +114,20 @@ end
 Computes the minimum level of a point
 """
 function level(x::Float64)
-    l=0
-    if x==0.5
+    l = 0
+    if x == 0.5
         l =  1
-    elseif x==0.0 || x==1.0
+    elseif x == 0.0 || x == 1.0
         l = 2
     else
         for l = 3:12
-            mod(x,1/2^(l-1))==0.0 && break
+            mod(x, 1 / 2^(l - 1)) == 0.0 && break
         end
     end
     return l
 end
 level(G::NGrid) = level(G.grid)
-level(X::Array{Float64}) = vec(sum(map(level,X),2)-size(X,2))
+level(X::Array{Float64}) = vec(sum(map(level, X), 2) - size(X, 2))
 
 
 """
@@ -144,35 +144,35 @@ Grid objects are callable taking two arguments. The first is a vector containing
 function values at the grid nodes. The second array contains rows of points at
 which the interpolant is to be evaluated.
 """
-function NGrid{BT<:BasisFunction}(L::Vector{Int},bounds::Array{Float64} = [0,1].*ones(1,length(L));B::Type{BT}=Linear)
-    grid,ind=SmolyakGrid(L)
-	covers = UInt16.(unique(ind,1))
-    covers_loc = zeros(UInt32,size(covers,1))
-    hind = vec(mapslices(hash,ind,2))
-    hcovers = vec(mapslices(hash,covers,2))
-    for i=1:size(covers,1)
-        covers_loc[i] = findfirst(hind,hcovers[i])
+function NGrid{BT<:BasisFunction}(L::Vector{Int}, bounds::Array{Float64} = [0, 1] .* ones(1, length(L));B::Type{BT} = Linear)
+    grid, ind = SmolyakGrid(L)
+	   covers = UInt16.(unique(ind, 1))
+    covers_loc = zeros(UInt32, size(covers, 1))
+    hind = vec(mapslices(hash, ind, 2))
+    hcovers = vec(mapslices(hash, covers, 2))
+    for i = 1:size(covers, 1)
+        covers_loc[i] = findfirst(hind, hcovers[i])
     end
 
-    G = NGrid{length(L),B}(L,
+    G = NGrid{length(L), B}(L,
                         bounds,
                         grid,
                         covers,
                         dM.(covers),
                         covers_loc,
-                        AdaptiveGrid([],zeros(Bool,size(grid,1)),[]),
-                        Vector{Int}[Int[] for i = 1:size(grid,1)],
-                        Vector{Float64}[Float64[] for i = 1:size(grid,1)]
+                        AdaptiveGrid([], zeros(Bool, size(grid, 1)), []),
+                        Vector{Int}[Int[] for i = 1:size(grid, 1)],
+                        Vector{Float64}[Float64[] for i = 1:size(grid, 1)]
                         )
-    G.adapt.active = (level(G).==maximum(level(G)))
-    buildW(G,hind,hcovers)
+    G.adapt.active = (level(G) .== maximum(level(G)))
+    buildW(G, hind, hcovers)
     return G
 end
 
-Base.show(io::IO,G::NGrid) = println(io,typeof(G),": $(size(G.grid,1))pts")
-Base.length(G::NGrid) = size(G.grid,1)
+Base.show(io::IO, G::NGrid) = println(io, typeof(G), ": $(size(G.grid,1))pts")
+Base.length(G::NGrid) = size(G.grid, 1)
 Base.size(G::NGrid) = size(G.grid)
-Base.values(G::NGrid) = nUtoX(G.grid,G.bounds)
+Base.values(G::NGrid) = nUtoX(G.grid, G.bounds)
 
 
-Base.getindex(G::NGrid,args...) = getindex(G.grid,args...)
+Base.getindex(G::NGrid, args...) = getindex(G.grid, args...)
