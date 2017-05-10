@@ -191,7 +191,7 @@ end
 
 # Generate interpolation functions for single function approximation
 for b in [(Linear, Lbj, cc_bf_l), (Quadratic, Qbj, cc_bf_q)]
-    for D = 2:12
+    for D = 2:15
         coverloop = :(@inbounds for ii in nc
             b   = B[G.covers[ii, $D], $D] * B[G.covers[ii, 1], 1]
             id1 = J[G.covers[ii, $D], $D]
@@ -210,7 +210,7 @@ for b in [(Linear, Lbj, cc_bf_l), (Quadratic, Qbj, cc_bf_q)]
             nc      = 1:size(G.covers, 1)
             nG      = length(G)
             ns      = (G.covers_loc[end] + prod(G.covers_dM[end, :]))
-            nc2     = ns:UInt16(nG)
+            nc2     = ns:UInt32(nG)
             dr1 = 1:$D
             mL      = maximum(G.L) + 1
             J         = zeros(Int, mL, $D)
@@ -251,7 +251,7 @@ end
 
 # Generate interpolation functions for multiple function approximation
 for b in [(Linear, Lbj, cc_bf_l), (Quadratic, Qbj, cc_bf_q)]
-    for D = 2:12
+    for D = 2:15
         coverloop = quote
             fill!(yi, 0.0)
             @inbounds for ii in nc
@@ -278,7 +278,7 @@ for b in [(Linear, Lbj, cc_bf_l), (Quadratic, Qbj, cc_bf_q)]
             nc      = 1:size(G.covers, 1)
             nG      = length(G)
             ns      = (G.covers_loc[end] + prod(G.covers_dM[end, :]))
-            nc2     = ns:UInt16(nG)
+            nc2     = ns:UInt32(nG)
             dr1 = 1:$D
             mL      = maximum(G.L) + 1
             J         = zeros(Int, mL, $D)

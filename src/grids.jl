@@ -19,9 +19,9 @@ mutable struct NGrid{D, B}
     L::Vector{Int}
     bounds::Array{Float64, 2}
     grid::Array{Float64, 2}
-	   covers::Array{UInt16, 2}
+    covers::Array{UInt16, 2}
     covers_dM::Array{UInt16, 2}
-	   covers_loc::Vector{UInt16}
+    covers_loc::Vector{UInt32}
 
     adapt::AdaptiveGrid
 

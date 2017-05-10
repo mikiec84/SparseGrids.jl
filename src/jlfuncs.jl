@@ -82,7 +82,7 @@ end
 
 
 for b in [(Linear, Lbj), (Quadratic, Qbj)]
-    for D = 2:20
+    for D = 2:15
         coverloop = :(@inbounds for ii in nc
             b   = B[G.covers[ii, $D], $D] * B[G.covers[ii, 1], 1]
             id1 = J[G.covers[ii, $D], $D]
@@ -131,7 +131,7 @@ mutable struct dimdef{n} end
 
 
 for b in [(Linear, Lbj), (Quadratic, Qbj)]
-    for D = 2:12
+    for D = 2:15
         for adim = 1:8
             coverloop = quote
                 fill!(yi, 0.0)
